@@ -1,0 +1,24 @@
+#!/bin/bash
+#  Author: Sergio "Checo" Gonzales
+#  Date: 28-05-2016
+#
+if [ -z $1 ]
+ then
+ echo Geography not given without default
+ exit $?
+fi
+
+if [ -z $2 ]
+ then
+ echo Posting Category not given without defulat
+ exit $?
+fi
+
+#  This can be used to scrape the backpage.com
+FILENAME=`date +%d-%m-%Y`
+#  Select geographies.. not sure how to implement this yet
+
+#  scrape topics
+curl {$1}.backpage.com/{$2} | grep -o http://[a-z]*.backpage.com/$2/[a-z\-]*/[0-9]* | uniq > $1_$2_$FILENAME.txt
+
+exit $?
