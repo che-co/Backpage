@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash -x 
 #  Author: Sergio "Checo" Gonzales
 #  Date: 28-05-2016
 #  This can be used to scrape the backpage.com
@@ -34,25 +34,38 @@ fi
 until [ -z "$2" ]; do
 
  NEWNAME="$2"_"$CATEGORY"_"$DATE"
- 
- if [ `ls ./URLS | grep -c "$NEWNAME"` -eq 0 ]; then
-   NEWPOSTING="$NEWNAME".txt
+
+##  May be useful if running twice in one day...
+# if [ `ls ./URLS | grep -c "$NEWNAME"` -eq 0 ]; then
+#  NEWPOSTING="$NEWNAME".txt
+# else
+#   NEWPOSTING="$NEWNAME"\(`ls ./URLS | grep -c "$NEWNAME"`\).txt
+# fi
+##
+
+#  Download URLS and check remove URLS previously downloaded
+#  Still need to implement for subsequent pages
+
+ curl -s "$2".backpage.com/{"$CATEGORY",:} | grep -o -e"http://[a-z]*.backpage.com/"{"$CATEGORY",:}"/[a-z\-]*/[0-9]*" | uniq > ./URLS/"$NEWNAME"_temp.txt
+
+ if [ `ls ./URLS/"$2"* | grep -e{"$CATEGORY",:}` -le 1 ]; then 
+   sort -o ./URLS/"$NEWNAME"_temp.txt ./URLS/"$NEWNAME"_temp.txt
+   mv ./URLS/"$NEWNAME"_temp.txt ./URLS/"$NEWPOSTING"
  else
-   NEWPOSTING="$NEWNAME"\(`ls ./URLS | grep -c "$NEWNAME"`\).txt
+   sort -u `ls ./URLS/"$2"* | grep -e{"$CATEGORY",:}` > ./URLS/"$NEWPOSTING"
+   rm ./URLS/"$NEWNAME"_temp.txt
  fi
-
- curl "$2".backpage.com/{"$CATEGORY",:} | grep -o -e"http://[a-z]*.backpage.com/"{"$CATEGORY",:}"/[a-z\-]*/[0-9]*" | uniq > ./URLS/"$NEWNAME"_temp.txt
-
-   if [ `ls ./URLS/ | grep -c -e"$2"[a-z,_]*{"$CATEGORY",:}` -le 1 ]; then 
-     sort -o ./URLS/"$NEWNAME"_temp.txt ./URLS/"$NEWNAME"_temp.txt
-     mv ./URLS/"$NEWNAME"_temp.txt ./URLS/"$NEWPOSTING"
-   else
-     sort -u `ls ./URLS/ | grep -e"$2"[a-z,_]*{"$CATEGORY",:}` > ./URLS/"$NEWPOSTING"
-     rm ./URLS/"$NEWNAME"_temp.txt
-   fi
    echo "$2" completed
    shift
-
 done
+
+#  Record ads that are paid advertisment and remove duplicates
+#+ from other URL lists
+
+
+
+#  Download and organize content
+
+
 
 exit $?
