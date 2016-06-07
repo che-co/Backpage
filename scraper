@@ -1,4 +1,4 @@
-#!/bin/bash -x 
+#!/bin/bash 
 #  Author: Sergio "Checo" Gonzales
 #  Date: 28-05-2016
 #  This can be used to scrape the backpage.com
@@ -28,13 +28,17 @@ if [ ! -d ./URLS ]; then
  mkdir ./URLS
 fi
 
+if [ ! -d .pages ]; then
+ mkdir .pages
+if
+
 #  Select geographies.. not sure how to implement this yet
 
 #  Scrape topics
 until [ -z "$2" ]; do
 
  NEWNAME="$2"_"$CATEGORY"_"$DATE"
-
+ NEWPOSTING="$NEWNAME".txt
 ##  May be useful if running twice in one day...
 # if [ `ls ./URLS | grep -c "$NEWNAME"` -eq 0 ]; then
 #  NEWPOSTING="$NEWNAME".txt
@@ -46,15 +50,21 @@ until [ -z "$2" ]; do
 #  Download URLS and check remove URLS previously downloaded
 #  Still need to implement for subsequent pages
 
- curl -s "$2".backpage.com/{"$CATEGORY",:} | grep -o -e"http://[a-z]*.backpage.com/"{"$CATEGORY",:}"/[a-z\-]*/[0-9]*" | uniq > ./URLS/"$NEWNAME"_temp.txt
+ curl -s "$2".backpage.com/{"$CATEGORY",:}/"?=page""$page" > ./.pages/"$2"_{"$CATEGORY",:}_p"$page".html
+ 
+ #  Find every posting URL on currnet page
+ grep -o -e"http://[a-z]*.backpage.com/"{"$CATEGORY",:}"/[a-z\-]*/[0-9]*" ./.pages/"$2"_{"$CATEGORY",:}_p"$page".html | uniq > ./URLS/"$NEWNAME"_temp.txt
 
- if [ `ls ./URLS/"$2"* | grep -e{"$CATEGORY",:}` -le 1 ]; then 
+ #  Find all the paid ad URL on current page
+ grep -o -e
+ if [ `ls ./URLS/ | grep -c -e"$2"[a-z,_]*{"$CATEGORY",:}` -le 1 ]; then 
    sort -o ./URLS/"$NEWNAME"_temp.txt ./URLS/"$NEWNAME"_temp.txt
    mv ./URLS/"$NEWNAME"_temp.txt ./URLS/"$NEWPOSTING"
  else
    sort -u `ls ./URLS/"$2"* | grep -e{"$CATEGORY",:}` > ./URLS/"$NEWPOSTING"
    rm ./URLS/"$NEWNAME"_temp.txt
  fi
+
    echo "$2" completed
    shift
 done
