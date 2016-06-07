@@ -1,24 +1,58 @@
-#!/bin/bash
+#!/bin/bash 
 #  Author: Sergio "Checo" Gonzales
 #  Date: 28-05-2016
-#
-if [ -z $1 ]
- then
- echo Geography not given without default
- exit $?
-fi
-
-if [ -z $2 ]
- then
- echo Posting Category not given without defulat
- exit $?
-fi
-
 #  This can be used to scrape the backpage.com
-FILENAME=`date +%d-%m-%Y`
+
+DATE=`date +%d-%m-%Y`
+CATEGORY="$1"
+NEWNAME="$CATEGORY"_"$2"_"$DATE"
+NEWPOSTING="$NEWNAME".txt
+
+#  Test for valid params and necessary directories.
+#  If directories do not exist, create them.
+
+if [ -z "$1" ]; then
+ echo "Error: Posting category or categories not given without defulat"
+ echo "Usage: $0 [category,category,...] [geography] [geography] ..."
+ exit 1
+fi
+
+if [ -z "$2" ]; then
+ echo "Error: Geography or georgraphies not given without default"
+ echo "Usage: $0 [category,category,...] [geography] [geography] ..."
+ exit 1 
+fi
+
+if [ ! -d ./URLS ]; then
+ echo './URLS did not previously exist'
+ mkdir ./URLS
+fi
+
 #  Select geographies.. not sure how to implement this yet
 
-#  scrape topics
-curl {$1}.backpage.com/{$2} | grep -o http://[a-z]*.backpage.com/$2/[a-z\-]*/[0-9]* | uniq > $1_$2_$FILENAME.txt
+#  Scrape topics
+until [ -z "$2" ]; do
+
+ NEWNAME="$2"_"$CATEGORY"_"$DATE"
+ 
+ if [ `ls ./URLS | grep -c "$NEWNAME"` -eq 0 ]; then
+   NEWPOSTING="$NEWNAME".txt
+ else
+   NEWPOSTING="$NEWNAME"\(`ls ./URLS | grep -c "$NEWNAME"`\).txt
+ fi
+
+ curl "$2".backpage.com/{"$CATEGORY",:} | grep -o -e"http://[a-z]*.backpage.com/"{"$CATEGORY",:}"/[a-z\-]*/[0-9]*" | uniq > ./URLS/"$NEWNAME"_temp.txt
+
+   if [ `ls ./URLS/ | grep -c -e"$2"[a-z,_]*{"$CATEGORY",:}` -le 1 ]; then 
+     sort -o ./URLS/"$NEWNAME"_temp.txt ./URLS/"$NEWNAME"_temp.txt
+     mv ./URLS/"$NEWNAME"_temp.txt ./URLS/"$NEWPOSTING"
+   else
+     sort -u `ls ./URLS/ | grep -e"$2"[a-z,_]*{"$CATEGORY",:}` > ./URLS/"$NEWPOSTING"
+     rm ./URLS/"$NEWNAME"_temp.txt
+   fi
+   echo "$2" completed
+   shift
+
+done
 
 exit $?
