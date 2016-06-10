@@ -1,6 +1,6 @@
 #!/bin/bash  
 #  Author: Sergio "Checo" Gonzales
-#  Date: 07-06-2016
+#  Date: 07-10-2016
 #  This can be used to scrape the backpage.com
 CATEGORY="$1,"
 DATE=`date +%d-%m-%Y`
@@ -34,47 +34,43 @@ fi
 #  Scrape topics
 until [ -z "$2" ]; do
 
-##  May be useful if running twice in one day...
-# if [ `ls ./URLS | grep -c "$NEWNAME"` -eq 0 ]; then
-#  NEWPOSTING="$NEWNAME".txt
-# else
-#   NEWPOSTING="$NEWNAME"\(`ls ./URLS | grep -c "$NEWNAME"`\).txt
-# fi
-##
-
 #  Download URLS and check remove URLS previously downloaded
 #  Still need to implement for subsequent pages
- for category in `eval echo {$CATEGORY}`; do
-   FNAME="$2"_"$category"_"$DATE"
+	for category in `eval echo {$CATEGORY}`; do
+		PAGE=1
+		until [ "$PAGE" -gt 444 ]; do
+			FNAME="$2"_"$category"_"$DATE"
    
-   curl -s "$2".backpage.com/"$category"/"&page=$PAGE" > ./.pages/"$FNAME"_pg"$PAGE".html
- 
- #  Find every posting URL on currnet page
-   grep -o http://[a-z]*.backpage.com/"$category"/[a-z\-]*/[0-9]* ./.pages/"$FNAME"_pg"$PAGE".html | uniq > ./URLS/"$FNAME"_temp.txt
+			curl -s "$2".backpage.com/"$category"/"&page=$PAGE" > ./.pages/"$FNAME"_pg"$PAGE".html
+   #  Test to see if the posting pages has ended and there are "No more matches."
+			grep -s "<div><b>No matches found.</b><br><br></div>" ./.pages/"$FNAME"_pg"$PAGE".html
+			if [ $? -eq 0 ]; then
+				echo No more posting at page: "$PAGE". "$2"_"$category" completed.
+				break
+			fi
+   #  Find every posting URL on currnet page
+			grep -o http://[a-z]*.backpage.com/"$category"/[a-z\-]*/[0-9]* ./.pages/"$FNAME"_pg"$PAGE".html | uniq > ./URLS/"$FNAME"_temp.txt
 
- #  Find all the sponsored ad URLs on current page
-   if [ `ls ./URLS/ | grep -c "$2"[a-z,_]*"$category"` -le 1 ]; then 
-     sort -o ./URLS/"$FNAME"_temp.txt ./URLS/"$FNAME"_temp.txt
-     mv ./URLS/"$FNAME"_temp.txt ./URLS/"$FNAME".txt
-echo 1
-   else
-     sort -u `ls ./URLS/"$2"* | grep "$category"` > ./URLS/"$FNAME".txt
-     rm ./URLS/"$FNAME"_temp.txt
-echo 2
-   fi
- done
- echo "$2", page "$PAGE" completed
-# (($PAGE+=1)) 
- shift
+   #  Find all the sponsored ad URLs on current page
+     			if [ `ls ./URLS/ | grep -c "$2"[a-z,_]*"$category"` -le 1 ]; then 
+       				sort -o ./URLS/"$FNAME"_temp.txt ./URLS/"$FNAME"_temp.txt
+       				mv ./URLS/"$FNAME"_temp.txt ./URLS/"$FNAME".txt
+     			else
+       				sort -u `ls ./URLS/"$2"* | grep "$category"` > ./URLS/"$FNAME".txt
+       				rm ./URLS/"$FNAME"_temp.txt
+     			fi
+     
+    			 ((PAGE+=1))
+		done 
+	done
+	shift
 done
 
 #  Record ads that are paid advertisment and remove duplicates
 #+ from other URL lists
 
 
-
 #  Download and organize content
-
 
 
 exit $?
