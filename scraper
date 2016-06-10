@@ -2,11 +2,8 @@
 #  Author: Sergio "Checo" Gonzales
 #  Date: 07-06-2016
 #  This can be used to scrape the backpage.com
-
+CATEGORY="$1,"
 DATE=`date +%d-%m-%Y`
-CATEGORY="$1"
-NEWNAME="$CATEGORY"_"$2"_"$DATE"
-NEWPOSTING="$NEWNAME".txt
 PAGE=1
 #  Test for valid params and necessary directories.
 #  If directories do not exist, create them.
@@ -37,9 +34,6 @@ fi
 #  Scrape topics
 until [ -z "$2" ]; do
 
- NEWNAME="$2"_"$CATEGORY"_"$DATE"
- TEMPNAME=
- NEWPOSTING="$NEWNAME".txt
 ##  May be useful if running twice in one day...
 # if [ `ls ./URLS | grep -c "$NEWNAME"` -eq 0 ]; then
 #  NEWPOSTING="$NEWNAME".txt
@@ -50,20 +44,22 @@ until [ -z "$2" ]; do
 
 #  Download URLS and check remove URLS previously downloaded
 #  Still need to implement for subsequent pages
- for category in {"$CATEGORY",}; do
-   curl -s "$2".backpage.com/"$category"/"&page=$PAGE" > ./.pages/"$2"_"$category"_p"$PAGE".html
+ for category in `eval echo {$CATEGORY}`; do
+   FNAME="$2"_"$category"_"$DATE"
+   
+   curl -s "$2".backpage.com/"$category"/"&page=$PAGE" > ./.pages/"$FNAME"_pg"$PAGE".html
  
  #  Find every posting URL on currnet page
-   grep -o http://[a-z]*.backpage.com/"$category"/[a-z\-]*/[0-9]* ./.pages/"$2"_"$category"_p"$PAGE".html | uniq > ./URLS/"$NEWNAME"_temp.txt
+   grep -o http://[a-z]*.backpage.com/"$category"/[a-z\-]*/[0-9]* ./.pages/"$FNAME"_pg"$PAGE".html | uniq > ./URLS/"$FNAME"_temp.txt
 
  #  Find all the sponsored ad URLs on current page
    if [ `ls ./URLS/ | grep -c "$2"[a-z,_]*"$category"` -le 1 ]; then 
-     sort -o ./URLS/"$NEWNAME"_temp.txt ./URLS/"$NEWNAME"_temp.txt
-     mv ./URLS/"$NEWNAME"_temp.txt ./URLS/"$NEWPOSTING"
+     sort -o ./URLS/"$FNAME"_temp.txt ./URLS/"$FNAME"_temp.txt
+     mv ./URLS/"$FNAME"_temp.txt ./URLS/"$FNAME".txt
 echo 1
    else
-     sort -u `ls ./URLS/"$2"* | grep "$category"` > ./URLS/"$NEWPOSTING"
-     rm ./URLS/"$NEWNAME"_temp.txt
+     sort -u `ls ./URLS/"$2"* | grep "$category"` > ./URLS/"$FNAME".txt
+     rm ./URLS/"$FNAME"_temp.txt
 echo 2
    fi
  done
