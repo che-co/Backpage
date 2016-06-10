@@ -20,13 +20,14 @@ if [ -z "$2" ]; then
  exit 1 
 fi
 
-if [ ! -d ./URLS ]; then
- echo './URLS did not previously exist'
- mkdir ./URLS
+if [ ! -d ./URLS/non-sponsored ]; then
+ mkdir -p ./URLS/non-sponsored
 fi
-
-if [ ! -d .pages ]; then
- mkdir .pages
+if [ ! -d ./URLS/sponsored ]; then
+ mkdir -p ./URLS/sponsored
+fi
+if [ ! -d ./.pages/"$DATE" ]; then
+ mkdir -p ./.pages/"$DATE"
 fi
 
 #  Select geographies.. not sure how to implement this yet
@@ -36,31 +37,38 @@ until [ -z "$2" ]; do
 
 #  Download URLS and check remove URLS previously downloaded
 #  Still need to implement for subsequent pages
-	for category in `eval echo {$CATEGORY}`; do
+	for X in `eval echo {$CATEGORY}`; do
 		PAGE=1
 		until [ "$PAGE" -gt 444 ]; do
-			FNAME="$2"_"$category"_"$DATE"
+			FNAME="$2"_"$X"_"$DATE"
    
-			curl -s "$2".backpage.com/"$category"/"&page=$PAGE" > ./.pages/"$FNAME"_pg"$PAGE".html
+			curl -s "$2".backpage.com/"$X"/"&page=$PAGE" > ./.pages/"$DATE"/"$FNAME"_pg"$PAGE".html
    #  Test to see if the posting pages has ended and there are "No more matches."
-			grep -s "<div><b>No matches found.</b><br><br></div>" ./.pages/"$FNAME"_pg"$PAGE".html
+			grep -s "<div><b>No matches found.</b><br><br></div>" ./.pages/"$DATE"/"$FNAME"_pg"$PAGE".html
 			if [ $? -eq 0 ]; then
-				echo No more posting at page: "$PAGE". "$2"_"$category" completed.
+				echo No more posting at page: "$PAGE". "$2"_"$X" completed.
 				break
 			fi
-   #  Find every posting URL on currnet page
-			grep -o http://[a-z]*.backpage.com/"$category"/[a-z\-]*/[0-9]* ./.pages/"$FNAME"_pg"$PAGE".html | uniq > ./URLS/"$FNAME"_temp.txt
+   #  Find every posting and sponsord URLs on currnet page
+#			grep -o http://[a-z]*.backpage.com/"$category"/[a-z\-]*/[0-9]* ./.pages/"$FNAME"_pg"$PAGE".html | uniq > ./URLS/"$FNAME"_temp.txt
+			grep -o /"$X"/[a-z\-]*/[0-9]* ./.pages/"$DATE"/"$FNAME"_pg"$PAGE".html | sort | uniq > ./URLS/"$FNAME"_temp.txt
+			grep "sponsorBoxPlusImages" ./.pages/"$DATE"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$FNAME"_ads_temp.txt
 
-   #  Find all the sponsored ad URLs on current page
-     			if [ `ls ./URLS/ | grep -c "$2"[a-z,_]*"$category"` -le 1 ]; then 
-       				sort -o ./URLS/"$FNAME"_temp.txt ./URLS/"$FNAME"_temp.txt
-       				mv ./URLS/"$FNAME"_temp.txt ./URLS/"$FNAME".txt
+     			if [ `ls ./URLS/ | grep -c "$2"[a-z,_]*"$X"` -le 1 ]; then 
+       				mv ./URLS/"$FNAME"_temp.txt ./URLS/non-sponsored/"$FNAME".txt
      			else
-       				sort -u `ls ./URLS/"$2"* | grep "$category"` > ./URLS/"$FNAME".txt
+       				sort -u `ls ./URLS/"$2"* | grep "$X"` > ./URLS/non-sponsored/"$FNAME".txt
        				rm ./URLS/"$FNAME"_temp.txt
      			fi
-     
-    			 ((PAGE+=1))
+			if [ `ls ./URLS/ | grep -c "$2"[a-z,_]*"$X"` -le 1 ]; then
+				mv ./URLS/"$FNAME"_ads_temp.txt ./URLS/sponsored/"$FNAME"_sponsored.txt
+			else
+				sort -u `ls ./URLS/ | grep "$X"` > ./URLS/sponsored/"$FNAME"_sponsored.txt
+    				rm ./URLS/"$FNAME"_ads_temp.txt
+			fi
+
+			
+    			((PAGE+=1))
 		done 
 	done
 	shift
