@@ -1,6 +1,6 @@
 #!/bin/bash  
 #  Author: Sergio "Checo" Gonzales
-#  Date: 07-10-2016
+#  Date: 07-11-2016
 #  This can be used to scrape the backpage.com
 CATEGORY="$1,"
 DATE=`date +%d-%m-%Y`
@@ -20,53 +20,62 @@ if [ -z "$2" ]; then
  exit 1 
 fi
 
-if [ ! -d ./URLS/non-sponsored ]; then
- mkdir -p ./URLS/non-sponsored
-fi
-if [ ! -d ./URLS/sponsored ]; then
- mkdir -p ./URLS/sponsored
-fi
-if [ ! -d ./.pages/"$DATE" ]; then
- mkdir -p ./.pages/"$DATE"
-fi
-
 #  Select geographies.. not sure how to implement this yet
 
 #  Scrape topics
 until [ -z "$2" ]; do
+	SPATH=./URLS/sponsored/"$2"
+	NSPATH=./URLS/non-sponsored/"$2"
+	PPATH=./.pages/"$2"/"$DATE"
 
+	if [ 0 -eq 0 ]; then
+		echo $2
+	fi
+
+	if [ ! -d "$NSPATH" ]; then
+		mkdir -p "$NSPATH"
+	fi
+
+	if [ ! -d "$SPATH" ]; then
+		mkdir -p "$SPATH"
+	fi
+	if [ ! -d "$PPATH" ]; then
+		mkdir -p "$PPATH"
+	fi
 #  Download URLS and check remove URLS previously downloaded
 #  Still need to implement for subsequent pages
 	for X in `eval echo {$CATEGORY}`; do
 		PAGE=1
+		if [ 0 -eq 0 ]; then
+			echo -e "\t $X"
+		fi
+		 
 		until [ "$PAGE" -gt 444 ]; do
 			FNAME="$2"_"$X"_"$DATE"
    
-			curl -s "$2".backpage.com/"$X"/"&page=$PAGE" > ./.pages/"$DATE"/"$FNAME"_pg"$PAGE".html
+			curl -s "$2".backpage.com/"$X"/"&page=$PAGE" > "$PPATH"/"$FNAME"_pg"$PAGE".html
    #  Test to see if the posting pages has ended and there are "No more matches."
-			grep -s "<div><b>No matches found.</b><br><br></div>" ./.pages/"$DATE"/"$FNAME"_pg"$PAGE".html
+			grep -q "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$FNAME"_pg"$PAGE".html
 			if [ $? -eq 0 ]; then
-				echo No more posting at page: "$PAGE". "$2"_"$X" completed.
+				echo -e "\t No more posting at page: $PAGE."
 				break
 			fi
    #  Find every posting and sponsord URLs on currnet page
-#			grep -o http://[a-z]*.backpage.com/"$category"/[a-z\-]*/[0-9]* ./.pages/"$FNAME"_pg"$PAGE".html | uniq > ./URLS/"$FNAME"_temp.txt
-			grep -o /"$X"/[a-z\-]*/[0-9]* ./.pages/"$DATE"/"$FNAME"_pg"$PAGE".html | sort | uniq > ./URLS/"$FNAME"_temp.txt
-			grep "sponsorBoxPlusImages" ./.pages/"$DATE"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$FNAME"_ads_temp.txt
+			grep -v "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$NSPATH"/"$FNAME"_temp.txt
+			grep "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SPATH"/"$FNAME"_ads_temp.txt
 
-     			if [ `ls ./URLS/ | grep -c "$2"[a-z,_]*"$X"` -le 1 ]; then 
-       				mv ./URLS/"$FNAME"_temp.txt ./URLS/non-sponsored/"$FNAME".txt
+     			if [ `ls -1 "$NSPATH" | wc -l` -le 1 ]; then 
+       				mv "$NSPATH"/"$FNAME"_temp.txt "$NSPATH"/"$FNAME".txt
      			else
-       				sort -u `ls ./URLS/"$2"* | grep "$X"` > ./URLS/non-sponsored/"$FNAME".txt
-       				rm ./URLS/"$FNAME"_temp.txt
+       				sort -u `ls -d  "$NSPATH"/* | grep "$X"` > "$NSPATH"/"$FNAME".txt
+       				rm "$NSPATH"/"$FNAME"_temp.txt
      			fi
-			if [ `ls ./URLS/ | grep -c "$2"[a-z,_]*"$X"` -le 1 ]; then
-				mv ./URLS/"$FNAME"_ads_temp.txt ./URLS/sponsored/"$FNAME"_sponsored.txt
+			if [ `ls -1 "$SPATH" | wc -l` -le 1 ]; then
+				mv "$SPATH"/"$FNAME"_ads_temp.txt "$SPATH"/"$FNAME"_sponsored.txt
 			else
-				sort -u `ls ./URLS/ | grep "$X"` > ./URLS/sponsored/"$FNAME"_sponsored.txt
-    				rm ./URLS/"$FNAME"_ads_temp.txt
+				sort -u `ls -d "$SPATH"/* | grep "$X"` > "$SPATH"/"$FNAME"_sponsored.txt
+    				rm "$SPATH"/"$FNAME"_ads_temp.txt
 			fi
-
 			
     			((PAGE+=1))
 		done 
