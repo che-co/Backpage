@@ -9,85 +9,93 @@ PAGE=1
 #  If directories do not exist, create them.
 
 if [ -z "$1" ]; then
- echo "Error: Posting category or categories not given without defulat"
- echo "Usage: $0 [category,category,...] [geography] [geography] ..."
- exit 1
+	echo "Error: Posting category or categories not given without defulat"
+	echo "Usage: $0 [category,category,...] [geography] [geography] ..."
+	exit 1
 fi
 
 if [ -z "$2" ]; then
- echo "Error: Geography or georgraphies not given without default"
- echo "Usage: $0 [category,category,...] [geography] [geography] ..."
- exit 1 
+	echo "Error: Geography or georgraphies not given without default"
+	echo "Usage: $0 [category,category,...] [geography] [geography] ..."
+	exit 1 
 fi
-
+if [ ! -d ./content ]; then
+	mkdir ./content
+fi
+if [ ! -e ./content/posting_content_raw.csv -o -s ./content/posting_content_raw.csv ]; then
+	echo TITLE,DATE,TIME,BODY,AGE,LOCATION,OTHER_POSTING,IMG_PATH > ./content/posting_content_raw.csv
+fi
 #  Select geographies.. not sure how to implement this yet
 
 #  Scrape topics
 until [ -z "$2" ]; do
-	SPATH=./URLS/sponsored/"$2"
-	NSPATH=./URLS/non-sponsored/"$2"
+	SPATH=./URLs/sponsored/"$2"
+	NSPATH=./URLs/non-sponsored/"$2"
 	PPATH=./.pages/"$2"/"$DATE"
+	CPATH=./content/"$2"/
+	IPATH=./images/"$2"/
 
-	if [ 0 -eq 0 ]; then
-		echo $2
-	fi
-
-	if [ ! -d "$NSPATH" ]; then
-		mkdir -p "$NSPATH"
-	fi
-
-	if [ ! -d "$SPATH" ]; then
-		mkdir -p "$SPATH"
-	fi
-	if [ ! -d "$PPATH" ]; then
-		mkdir -p "$PPATH"
-	fi
 #  Download URLS and check remove URLS previously downloaded
 #  Still need to implement for subsequent pages
 	for X in `eval echo {$CATEGORY}`; do
 		PAGE=1
-		if [ 0 -eq 0 ]; then
-			echo -e "\t $X"
+		FNAME="$2"_"$X"_"$DATE"
+
+		if [ ! -d "$NSPATH"/"$X" ]; then
+			mkdir -p "$NSPATH"/"$X"
 		fi
-		 
+		if [ ! -d "$SPATH"/"$X" ]; then
+			mkdir -p "$SPATH"/"$X"
+		fi
+		if [ ! -d "$PPATH"/"$X" ]; then
+			mkdir -p "$PPATH"/"$X"
+		fi
+		if [ ! -d "$CPATH"/"$X" ]; then
+			mkdir -p "$CPATH"/"$X"
+		fi
+		if [ ! -d "$IPATH"/"$X" ]; then
+			mkdir -p "$IPATH"/"$X"
+		fi	
+		
 		until [ "$PAGE" -gt 444 ]; do
-			FNAME="$2"_"$X"_"$DATE"
+			if [ 0 -eq 0 ]; then
+				echo downloading URLs for "$2"/"$X"/page"$PAGE"
+			fi
    
-			curl -s "$2".backpage.com/"$X"/"&page=$PAGE" > "$PPATH"/"$FNAME"_pg"$PAGE".html
+			curl -s "$2".backpage.com/"$X"/"&page=$PAGE" > "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html
    #  Test to see if the posting pages has ended and there are "No more matches."
-			grep -q "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$FNAME"_pg"$PAGE".html
+			grep -q "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html
 			if [ $? -eq 0 ]; then
-				echo -e "\t No more posting at page: $PAGE."
+				echo No more posting at page: "$PAGE".
 				break
 			fi
    #  Find every posting and sponsord URLs on currnet page
-			grep -v "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$NSPATH"/"$FNAME"_temp.txt
-			grep "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SPATH"/"$FNAME"_ads_temp.txt
+			grep -v "sponsorBoxPlusImages" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$NSPATH"/"$X"/"$FNAME"_temp.txt
+			grep "sponsorBoxPlusImages" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SPATH"/"$X"/"$FNAME"_ads_temp.txt
 
-     			if [ `ls -1 "$NSPATH" | wc -l` -le 1 ]; then 
-       				mv "$NSPATH"/"$FNAME"_temp.txt "$NSPATH"/"$FNAME".txt
+     			if [ `ls -1 "$NSPATH"/"$X" | wc -l` -le 1 ]; then 
+       				mv "$NSPATH"/"$X"/"$FNAME"_temp.txt "$NSPATH"/"$X"/"$FNAME".txt
      			else
-       				sort -u `ls -d  "$NSPATH"/* | grep "$X"` > "$NSPATH"/"$FNAME".txt
-       				rm "$NSPATH"/"$FNAME"_temp.txt
+       				sort -u `ls -d  "$NSPATH"/"$X"/*` > "$NSPATH"/"$X"/"$FNAME".txt
+       				rm "$NSPATH"/"$X"/"$FNAME"_temp.txt
      			fi
-			if [ `ls -1 "$SPATH" | wc -l` -le 1 ]; then
-				mv "$SPATH"/"$FNAME"_ads_temp.txt "$SPATH"/"$FNAME"_sponsored.txt
+			if [ `ls -1 "$SPATH"/"$X" | wc -l` -le 1 ]; then
+				mv "$SPATH"/"$X"/"$FNAME"_ads_temp.txt "$SPATH"/"$X"/"$FNAME"_sponsored.txt
 			else
-				sort -u `ls -d "$SPATH"/* | grep "$X"` > "$SPATH"/"$FNAME"_sponsored.txt
-    				rm "$SPATH"/"$FNAME"_ads_temp.txt
+				sort -u `ls -d "$SPATH"/"$X"/*` > "$SPATH"/"$X"/"$FNAME"_sponsored.txt
+    				rm "$SPATH"/"$X"/"$FNAME"_ads_temp.txt
 			fi
 			
     			((PAGE+=1))
 		done 
+#  Download and organize content
+		echo downloading sponsored content for "$2"/"$X"
+		while read URL; do
+			
+		done < "$SPATH"/"$X"/"$FNAME"_sponsored.txt
 	done
 	shift
 done
-
-#  Record ads that are paid advertisment and remove duplicates
-#+ from other URL lists
-
-
-#  Download and organize content
 
 
 exit $?
