@@ -1,0 +1,17 @@
+#!/bin/bash -x
+
+#  Find the posting body--this needs some major work
+#  (1) greping over line breaks
+#  (2) greping weird characters
+#  (3) finding the start and end of the posting body
+paste -sd_ ./page.html | tr -d '_' | tr -s ' ' | pcregrep -M \<div\ class=\"postingBody\"[[:alnum:][:space:]* 
+
+echo; echo ===========================================================; echo
+
+#  Find the "metaInfo" or poster's age
+grep metaInfo <./page.html | grep -io \>[[:print:]]*\<
+# cat file | tr -d '\n' | tr -s ' ' | grep -o \<div\ class=\"postingBody\"\>[.[:space:]]*.*
+LASTCALL=$?
+echo; echo +++++++++++++++++++++++++++++++++++++++++++++++
+echo exit status: $LASTCALL
+exit $?
