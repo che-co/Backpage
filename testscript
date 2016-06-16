@@ -5,7 +5,7 @@
 #  (2) greping weird characters
 #  (3) finding the start and end of the posting body
 paste -sd_ ./page.html | tr -d '_' | tr -s ' ' | pcregrep -M \<div\ class=\"postingBody\"[[:alnum:][:space:]* 
-
+#*\<div\ class=\"postingBody\"*(.*[\n\s]*)(?!\<\/div\>)$
 echo; echo ===========================================================; echo
 
 #  Find the "metaInfo" or poster's age
