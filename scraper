@@ -1,10 +1,10 @@
 #!/bin/bash  
+shopt -s extglob 
 #  Author: Sergio "Checo" Gonzales
-#  Date: 07-16-2016
+#  Date: 07-19-2016
 #  This can be used to scrape the backpage.com
 CATEGORY="$1,"
 DATE=`date +%d-%m-%Y`
-PAGE=1
 #  Test for valid params and necessary directories.
 #  If directories do not exist, create them.
 
@@ -23,7 +23,7 @@ if [ ! -d ./content ]; then
 	mkdir ./content
 fi
 if [ ! -e ./content/posting_content_raw.csv -o -s ./content/posting_content_raw.csv ]; then
-	echo TITLE,DATE,TIME,BODY,AGE,LOCATION,OTHER_POSTING,IMG_PATH > ./content/posting_content_raw.csv
+	echo BODY,AGE,LOCATION,DATETIME,IMGPATH,ID,ADTYPE > ./content/posting_content_raw.csv
 fi
 #  Select geographies.. not sure how to implement this yet
 
@@ -31,9 +31,10 @@ fi
 until [ -z "$2" ]; do
 	SPATH=./URLs/sponsored/"$2"
 	NSPATH=./URLs/non-sponsored/"$2"
-	PPATH=./.pages/"$2"/"$DATE"
-	CPATH=./content/"$2"/
-	IPATH=./images/"$2"/
+	PPATH=./.pages/"$2"/
+	NSCPATH=./content/non-sponsored/"$2"
+	SCPATH=./content/sponsored/"$2"
+	IPATH=./content/images/
 
 #  Download URLS and check remove URLS previously downloaded
 #  Still need to implement for subsequent pages
@@ -50,52 +51,105 @@ until [ -z "$2" ]; do
 		if [ ! -d "$PPATH"/"$X" ]; then
 			mkdir -p "$PPATH"/"$X"
 		fi
-		if [ ! -d "$CPATH"/"$X" ]; then
-			mkdir -p "$CPATH"/"$X"
+		if [ ! -d "$NSCPATH"/"$X" ]; then
+			mkdir -p "$NSCPATH"/"$X"
 		fi
-		if [ ! -d "$IPATH"/"$X" ]; then
-			mkdir -p "$IPATH"/"$X"
-		fi	
-		
+		if [ ! -d "$SCPATH"/"$X" ]; then
+			mkdir -p "$SCPATH"/"$X"
+		fi
+
 		until [ "$PAGE" -gt 444 ]; do
-			if [ 0 -eq 0 ]; then
-				echo downloading URLs for "$2"/"$X"/page"$PAGE"
-			fi
+			echo downloading URLs for "$2"/"$X"/page"$PAGE"
    
-			curl -s "$2".backpage.com/"$X"/"&page=$PAGE" > "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html
+			curl -s ""$2".backpage.com/"$X"/&page="$PAGE"" > "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html
    #  Test to see if the posting pages has ended and there are "No more matches."
-			grep -q "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html
+			grep -q  "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html
 			if [ $? -eq 0 ]; then
-				echo No more posting at page: "$PAGE".
+				echo No more posting at page: "$PAGE"
 				break
 			fi
    #  Find every posting and sponsord URLs on currnet page
-			grep -v "sponsorBoxPlusImages" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$NSPATH"/"$X"/"$FNAME"_temp.txt
-			grep "sponsorBoxPlusImages" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SPATH"/"$X"/"$FNAME"_ads_temp.txt
+			grep -v "sponsorBoxPlusImages" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$NSPATH"/"$X"/."$FNAME"_NS.txt
+			grep "sponsorBoxPlusImages" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SPATH"/"$X"/."$FNAME"_S.txt
 
-     			if [ `ls -1 "$NSPATH"/"$X" | wc -l` -le 1 ]; then 
-       				mv "$NSPATH"/"$X"/"$FNAME"_temp.txt "$NSPATH"/"$X"/"$FNAME".txt
+     			if [ `ls -A -1 "$NSPATH"/"$X" | wc -l` -le 1 ]; then 
+       				mv "$NSPATH"/"$X"/."$FNAME"_NS.txt "$NSPATH"/"$X"/"$FNAME"_NS.txt
      			else
-       				sort -u `ls -d  "$NSPATH"/"$X"/*` > "$NSPATH"/"$X"/"$FNAME".txt
-       				rm "$NSPATH"/"$X"/"$FNAME"_temp.txt
+       				sort -u "$NSPATH"/"$X"/."$FNAME"_NS.txt `ls -A -d  "$NSPATH"/"$X"/*` > "$NSPATH"/"$X"/"$FNAME"_NS.txt
+       				rm "$NSPATH"/"$X"/."$FNAME"_NS.txt
      			fi
-			if [ `ls -1 "$SPATH"/"$X" | wc -l` -le 1 ]; then
-				mv "$SPATH"/"$X"/"$FNAME"_ads_temp.txt "$SPATH"/"$X"/"$FNAME"_sponsored.txt
+			if [ `ls -A -1 "$SPATH"/"$X" | wc -l` -le 1 ]; then
+				mv "$SPATH"/"$X"/."$FNAME"_S.txt "$SPATH"/"$X"/"$FNAME"_S.txt
 			else
-				sort -u `ls -d "$SPATH"/"$X"/*` > "$SPATH"/"$X"/"$FNAME"_sponsored.txt
-    				rm "$SPATH"/"$X"/"$FNAME"_ads_temp.txt
+				sort -u "$SPATH"/"$X"/."$FNAME"_S.txt `ls -A -d "$SPATH"/"$X"/*` > "$SPATH"/"$X"/"$FNAME"_S.txt
+    				rm "$SPATH"/"$X"/."$FNAME"_S.txt
 			fi
 			
     			((PAGE+=1))
 		done 
-#  Download and organize content
-		echo downloading sponsored content for "$2"/"$X"
+#  Download and organize content--I need to functionalize this!
+		echo downloading/extracting non-sponsored content for "$2"/"$X"
 		while read URL; do
+			curl -s "http://"$2".backpage.com/"$URL"" > "$NSCPATH"/.ad.txt
+			WRITEBODY=0
+			WRITEDT=0
 			
-		done < "$SPATH"/"$X"/"$FNAME"_sponsored.txt
+			#  Extract posting's body content
+			while read LINE; do
+			#	if [ $? -eq 0 -a "$WRITEBODY" -eq 1 ]; then
+			#needs to be moved break
+			#	fi
+				grep -q "</div>" <(echo "$LINE")
+				if [ $? -eq 0 ]; then
+					WRITEBODY=0
+				fi
+				if [ "$WRITEBODY" -eq 1 ]; then
+					BODY="${BODY}""${LINE}"$'\n'
+				fi
+				if [ "$WRITEDT" -eq 2 ]; then
+					DATETIME="$LINE"
+					WRITEDT=0
+				fi
+				grep -q "<div class=\"postingBody\">" <(echo "$LINE")
+				if [ $? -eq 0 ]; then
+					WRITEBODY=1
+				fi
+				pcregrep -q "(adInfo)?(Posted:)?" <(echo "$LINE")
+				if [ $? -eq 0 ]; then
+					((WRITEDT+=1))
+				fi
+			done < "$NSCPATH"/.ad.txt
+			BODY="${BODY//+([$'\n\r\t']|<br>)/ }"
+
+			#  Extract "poster's" age
+			AGE=`grep -oP "(?<=Poster's age: )[0-9]*" "$NSCPATH"/.ad.txt`
+			
+			#  Extract location information
+			LOCATION=`pcregrep -oM "(?<=Location:)\W*?.*\W*?(?=</div)" "$NSCPATH"/.ad.txt`
+			
+			#  Extract Post ID to other postings
+			ID=`grep -oP '(?<=Post ID: )[0-9]*' "$NSCPATH"/.ad.txt`
+			
+			#  Extract "Other Ads by this user!!!!!!!!!!!!!!!!!!!"
+			OTHERADS=`grep -v "http://"$2".backpage.com/"$URL"" <(grep -o "http://[a-z]\+\./backpage\.com/"$X"/[a-z\-]\+/[0-9]\+" "$NSCPATH"/.ad.txt)`
+			#  Download images	
+			IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "$NSCPATH"/.ad.txt)`
+			if [ ! -z "$IMGURL" ]; then
+				if [ ! -d "$IPATH"/non-sponsored/"$ID" ]; then
+					mkdir -p "$IPATH"/non-sponsored/"$ID"
+				fi
+				cd "$IPATH"/non-sponsored/"$ID"
+				echo downloading images
+				curl -O "{"$IMGURL"}"
+				cd -
+			fi
+
+			#  Needs verification of success
+			echo "\""$BODY"\","$AGE",\""$LOCATION"\",\""$DATETIME"\","$IPATH"/"$ID","$ID",0" >> ./content/posting_content_raw.csv
+
+		done < "$NSPATH"/"$X"/"$FNAME"_NS.txt
 	done
 	shift
 done
-
 
 exit $?
