@@ -23,19 +23,17 @@ if [ ! -d ./content ]; then
 	mkdir ./content
 fi
 if [ ! -e ./content/posting_content_raw.csv -o -s ./content/posting_content_raw.csv ]; then
-	echo BODY,AGE,LOCATION,DATETIME,IMGPATH,ID,ADTYPE > ./content/posting_content_raw.csv
+	echo BODY,AGE,LOCATION,DATETIME,ID,ADTYPE > ./content/posting_content_raw.csv
 fi
 #  Select geographies.. not sure how to implement this yet
 
 #  Scrape topics
 until [ -z "$2" ]; do
-	SPATH=./URLs/sponsored/"$2"
-	NSPATH=./URLs/non-sponsored/"$2"
+	SUPATH=./URLs/sponsored/"$2"
+	NSUPATH=./URLs/non-sponsored/"$2"
 	PPATH=./.pages/"$2"/
 	NSCPATH=./content/non-sponsored/"$2"
 	SCPATH=./content/sponsored/"$2"
-	IPATH=./content/images/
-
 #  Download URLS and check remove URLS previously downloaded
 #  Still need to implement for subsequent pages
 	for X in `eval echo {$CATEGORY}`; do
@@ -115,28 +113,39 @@ until [ -z "$2" ]; do
 			AGE=`grep -oP "(?<=Poster's age: )[0-9]*" "$NSCPATH"/.ad.txt`
 			
 			#  Extract location information
-			LOCATION=`pcregrep -oM "(?<=Location:)\W*?.*\W*?(?=</div)" "$NSCPATH"/.ad.txt`
+			LOCATION=`grep -oP "(?<=Location:)\W*?.*\W*?(?=</div)" "$NSCPATH"/.ad.txt`
 			
 			#  Extract Post ID to other postings
 			ID=`grep -oP '(?<=Post ID: )[0-9]*' "$NSCPATH"/.ad.txt`
 			
 			#  Extract "Other Ads by this user"
 			OTHERADS=`grep -v "http://"$2".backpage.com/"$URL"" <(grep -o "http://[a-z]\+\./backpage\.com/"$X"/[a-z\-]\+/[0-9]\+" "$NSCPATH"/.ad.txt)`
-			#  Download images	
+			#  Write content to file and download images
+			if [ ! -d "$NSCPATH"/"$ID" ]; then
+				mkdir -p "$NSCPATH"/"$ID"/img
+			fi
+			NSIPATH="$NSCPATH"/"$ID"/imgs
+			SIPATH="$SCPATH"/"$ID"/imgs
+			
+			echo "$BODY" > "$NSCPATH"/"$ID"/body.txt
+			echo "$DATETIME" > "$NSCPATH"/"$ID"/datetime.txt
+			echo "$AGE" > "$NSCPATH"/"$ID"/age.txt
+			echo "$LOCATION" > "$NSCPATH"/"$ID"/location.txt
+			if [ ! -z "$OTHERADS" ]; then
+				echo "$OTHERADS" > "$NSCPATH"/"$ID"/otheradurls.txt
+			fi
+
 			IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "$NSCPATH"/.ad.txt)`
 			if [ ! -z "$IMGURL" ]; then
-				if [ ! -d "$IPATH"/non-sponsored/"$ID" ]; then
-					mkdir -p "$IPATH"/non-sponsored/"$ID"
-				fi
-				cd "$IPATH"/non-sponsored/"$ID"
+				cd "$NSIPATH"
 				echo downloading images
 				curl -O "{"$IMGURL"}"
 				cd -
 			fi
 
 			#  Needs verification of success
-			echo "\""$BODY"\","$AGE",\""$LOCATION"\",\""$DATETIME"\","$IPATH"/"$ID","$ID",0" >> ./content/posting_content_raw.csv
-
+			echo "\""$BODY"\","$AGE",\""$LOCATION"\",\""$DATETIME"\","$ID",0" >> ./content/posting_content_raw.csv
+			BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=;
 		done < "$NSPATH"/"$X"/"$FNAME"_NS.txt
 	done
 	shift
