@@ -92,35 +92,25 @@ until [ -z "$2" ]; do
 		while read URL; do
 			curl -s "http://"$2".backpage.com/"$URL"" > "$NSCPATH"/.ad.txt
 			WRITEBODY=0
-			WRITEDT=0
 			
 			#  Extract posting's body content
 			while read LINE; do
-			#	if [ $? -eq 0 -a "$WRITEBODY" -eq 1 ]; then
-			#needs to be moved break
-			#	fi
 				grep -q "</div>" <(echo "$LINE")
-				if [ $? -eq 0 ]; then
-					WRITEBODY=0
+				if [ $? -eq 0 -a "$WRITEBODY" -eq 1 ]; then
+					break
 				fi
 				if [ "$WRITEBODY" -eq 1 ]; then
 					BODY="${BODY}""${LINE}"$'\n'
-				fi
-				if [ "$WRITEDT" -eq 2 ]; then
-					DATETIME="$LINE"
-					WRITEDT=0
 				fi
 				grep -q "<div class=\"postingBody\">" <(echo "$LINE")
 				if [ $? -eq 0 ]; then
 					WRITEBODY=1
 				fi
-				pcregrep -q "(adInfo)?(Posted:)?" <(echo "$LINE")
-				if [ $? -eq 0 ]; then
-					((WRITEDT+=1))
-				fi
 			done < "$NSCPATH"/.ad.txt
 			BODY="${BODY//+([$'\n\r\t']|<br>)/ }"
-
+			
+			#  Extract date and time of posting
+			DATETIME=`grep -o "[[:upper:]][[:lower:]]\+, [[:upper:]][[:lower:]]\+ [0-9]\+, [0-9]\{4\} [0-9]\+:[0-9]\{2\} [APM]*" "$NSCPATH"/.ad.txt`
 			#  Extract "poster's" age
 			AGE=`grep -oP "(?<=Poster's age: )[0-9]*" "$NSCPATH"/.ad.txt`
 			
@@ -130,7 +120,7 @@ until [ -z "$2" ]; do
 			#  Extract Post ID to other postings
 			ID=`grep -oP '(?<=Post ID: )[0-9]*' "$NSCPATH"/.ad.txt`
 			
-			#  Extract "Other Ads by this user!!!!!!!!!!!!!!!!!!!"
+			#  Extract "Other Ads by this user"
 			OTHERADS=`grep -v "http://"$2".backpage.com/"$URL"" <(grep -o "http://[a-z]\+\./backpage\.com/"$X"/[a-z\-]\+/[0-9]\+" "$NSCPATH"/.ad.txt)`
 			#  Download images	
 			IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "$NSCPATH"/.ad.txt)`
