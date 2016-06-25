@@ -23,7 +23,7 @@ if [ ! -d ./content ]; then
 	mkdir ./content
 fi
 if [ ! -e ./content/posting_content_raw.csv -o -s ./content/posting_content_raw.csv ]; then
-	echo BODY,AGE,LOCATION,DATETIME,ID,ADTYPE > ./content/posting_content_raw.csv
+	echo DATETIME,BODY,AGE,LOCATION,ID,ADTYPE > ./content/posting_content_raw.csv
 fi
 #  Select geographies.. not sure how to implement this yet
 
@@ -127,9 +127,9 @@ until [ -z "$2" ]; do
 			NSIPATH="$NSCPATH"/"$ID"/imgs
 			SIPATH="$SCPATH"/"$ID"/imgs
 			
-			echo "$BODY" > "$NSCPATH"/"$ID"/body.txt
 			echo "$DATETIME" > "$NSCPATH"/"$ID"/datetime.txt
-			echo "$AGE" > "$NSCPATH"/"$ID"/age.txt
+			echo "$BODY"	 > "$NSCPATH"/"$ID"/body.txt
+			echo "$AGE"	 > "$NSCPATH"/"$ID"/age.txt
 			echo "$LOCATION" > "$NSCPATH"/"$ID"/location.txt
 			if [ ! -z "$OTHERADS" ]; then
 				echo "$OTHERADS" > "$NSCPATH"/"$ID"/otheradurls.txt
@@ -144,7 +144,7 @@ until [ -z "$2" ]; do
 			fi
 
 			#  Needs verification of success
-			echo "\""$BODY"\","$AGE",\""$LOCATION"\",\""$DATETIME"\","$ID",0" >> ./content/posting_content_raw.csv
+			echo "\""$DATETIME"\",\""$BODY"\","$AGE",\""$LOCATION"\","$ID",0" >> ./content/posting_content_raw.csv
 			BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=;
 		done < "$NSPATH"/"$X"/"$FNAME"_NS.txt
 	done
