@@ -128,7 +128,7 @@ until [ -z "$2" ]; do
 			else
 				mkdir -p "$NSCPATH"/"$X"/"$ID"\(`ls "$NSCPATH"/"$X" | grep -c "$ID"`\)
 				CCPATH="$NSCPATH"/"$X"/"$ID"\(`ls "$NSCPATH"/"$X" | grep -c "$ID"`\)
-				echo ID: "$ID" already exists
+				echo ID: "$ID" already exists and will be duplcated
 			fi
 			
 			IPATH="$CCPATH"/imgs
@@ -143,14 +143,14 @@ until [ -z "$2" ]; do
 			IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "$NSCPATH"/.ad.txt)`
 			if [ ! -z "$IMGURL" ]; then
 				cd "$IPATH"
-				echo downloading images
-				curl -O "{"$IMGURL"}"
+				echo downloading images for "$NSCPATH"/"$X"/"$ID"
+				curl -Os "{"$IMGURL"}"
 				cd -
 			fi
 
 			#  Needs verification of success
 			echo "\""$DATETIME"\",\""$BODY"\","$AGE",\""$LOCATION"\","$ID",0" >> ./content/posting_content_raw.csv
-			BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=;IPATH=
+			BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=;
 		done < "$NSUPATH"/"$X"/"$FNAME"_NS.txt
 	done
 	shift
