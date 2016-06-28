@@ -1,7 +1,7 @@
 #!/bin/bash  
 shopt -s extglob 
 #  Author: Sergio "Checo" Gonzales
-#  Date: 07-19-2016
+#  Date: 07-27-2016
 #  This can be used to scrape the backpage.com
 CATEGORY="$1,"
 DATE=`date +%d-%m-%Y`
@@ -23,28 +23,28 @@ if [ ! -d ./content ]; then
 	mkdir ./content
 fi
 if [ ! -e ./content/posting_content_raw.csv -o -s ./content/posting_content_raw.csv ]; then
-	echo DATETIME,BODY,AGE,LOCATION,ID,ADTYPE > ./content/posting_content_raw.csv
+	echo DATTIME,BODY,AGE,LOCATION,ID,ADTYPE > ./content/posting_content_raw.csv
 fi
 #  Select geographies.. not sure how to implement this yet
 
 #  Scrape topics
 until [ -z "$2" ]; do
-	SUPATH=./URLs/sponsored/"$2"
-	NSUPATH=./URLs/non-sponsored/"$2"
-	PPATH=./.pages/"$2"/
-	NSCPATH=./content/non-sponsored/"$2"
-	SCPATH=./content/sponsored/"$2"
+	SUPATH=./URLs/"$2"/sponsored
+	NSUPATH=./URLs/"$2"non-sponsored/
+	PPATH=./.pages/"$2"
+	NSCPATH=./content/"$2"/non-sponsored
+	SCPATH=./content/"$2"/sponsored
 #  Download URLS and check remove URLS previously downloaded
 #  Still need to implement for subsequent pages
 	for X in `eval echo {$CATEGORY}`; do
 		PAGE=1
 		FNAME="$2"_"$X"_"$DATE"
 
-		if [ ! -d "$NSPATH"/"$X" ]; then
-			mkdir -p "$NSPATH"/"$X"
+		if [ ! -d "$NSUPATH"/"$X" ]; then
+			mkdir -p "$NSUPATH"/"$X"
 		fi
-		if [ ! -d "$SPATH"/"$X" ]; then
-			mkdir -p "$SPATH"/"$X"
+		if [ ! -d "$SUPATH"/"$X" ]; then
+			mkdir -p "$SUPATH"/"$X"
 		fi
 		if [ ! -d "$PPATH"/"$X" ]; then
 			mkdir -p "$PPATH"/"$X"
@@ -67,20 +67,20 @@ until [ -z "$2" ]; do
 				break
 			fi
    #  Find every posting and sponsord URLs on currnet page
-			grep -v "sponsorBoxPlusImages" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$NSPATH"/"$X"/."$FNAME"_NS.txt
-			grep "sponsorBoxPlusImages" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SPATH"/"$X"/."$FNAME"_S.txt
+			grep -v "sponsorBoxPlusImages" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$NSUPATH"/"$X"/."$FNAME"_NS.txt
+			grep "sponsorBoxPlusImages" "$PPATH"/"$X"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SUPATH"/"$X"/."$FNAME"_S.txt
 
-     			if [ `ls -A -1 "$NSPATH"/"$X" | wc -l` -le 1 ]; then 
-       				mv "$NSPATH"/"$X"/."$FNAME"_NS.txt "$NSPATH"/"$X"/"$FNAME"_NS.txt
+     			if [ `ls -A -1 "$NSUPATH"/"$X" | wc -l` -le 1 ]; then 
+       				mv "$NSUPATH"/"$X"/."$FNAME"_NS.txt "$NSUPATH"/"$X"/"$FNAME"_NS.txt
      			else
-       				sort -u "$NSPATH"/"$X"/."$FNAME"_NS.txt `ls -A -d  "$NSPATH"/"$X"/*` > "$NSPATH"/"$X"/"$FNAME"_NS.txt
-       				rm "$NSPATH"/"$X"/."$FNAME"_NS.txt
+       				sort -u "$NSUPATH"/"$X"/."$FNAME"_NS.txt `ls -A -d  "$NSUPATH"/"$X"/*` > "$NSUPATH"/"$X"/"$FNAME"_NS.txt
+       				rm "$NSUPATH"/"$X"/."$FNAME"_NS.txt
      			fi
-			if [ `ls -A -1 "$SPATH"/"$X" | wc -l` -le 1 ]; then
-				mv "$SPATH"/"$X"/."$FNAME"_S.txt "$SPATH"/"$X"/"$FNAME"_S.txt
+			if [ `ls -A -1 "$SUPATH"/"$X" | wc -l` -le 1 ]; then
+				mv "$SUPATH"/"$X"/."$FNAME"_S.txt "$SUPATH"/"$X"/"$FNAME"_S.txt
 			else
-				sort -u "$SPATH"/"$X"/."$FNAME"_S.txt `ls -A -d "$SPATH"/"$X"/*` > "$SPATH"/"$X"/"$FNAME"_S.txt
-    				rm "$SPATH"/"$X"/."$FNAME"_S.txt
+				sort -u "$SUPATH"/"$X"/."$FNAME"_S.txt `ls -A -d "$SUPATH"/"$X"/*` > "$SUPATH"/"$X"/"$FNAME"_S.txt
+    				rm "$SUPATH"/"$X"/."$FNAME"_S.txt
 			fi
 			
     			((PAGE+=1))
@@ -122,22 +122,26 @@ until [ -z "$2" ]; do
 			OTHERADS=`grep -v "http://"$2".backpage.com/"$URL"" <(grep -o "http://[a-z]\+\./backpage\.com/"$X"/[a-z\-]\+/[0-9]\+" "$NSCPATH"/.ad.txt)`
 			#  Write content to file and download images
 			if [ ! -d "$NSCPATH"/"$ID" ]; then
-				mkdir -p "$NSCPATH"/"$ID"/img
+				mkdir -p "$NSCPATH"/"$ID"/imgs
+				CCPATH="$NSCPATH"/"$X"/"$ID"
+			else
+				mkdir -p "$NSCPATH"/"$ID"\(`ls "$NSCPATH" | grep -c "$ID"`\)
+				CCPATH="$NSCPATH"/"$X"/"$ID"\(`ls -1 "$NSCPATH"/"$ID"* | wc -l`\)
+				echo ID: "$ID" already exists
 			fi
-			NSIPATH="$NSCPATH"/"$ID"/imgs
-			SIPATH="$SCPATH"/"$ID"/imgs
 			
-			echo "$DATETIME" > "$NSCPATH"/"$ID"/datetime.txt
-			echo "$BODY"	 > "$NSCPATH"/"$ID"/body.txt
-			echo "$AGE"	 > "$NSCPATH"/"$ID"/age.txt
-			echo "$LOCATION" > "$NSCPATH"/"$ID"/location.txt
+			IPATH="$CCPATH"/imgs
+			echo "$DATETIME" > "$CCPATH"/datetime.txt
+			echo "$BODY"	 > "$CCPATH"/body.txt
+			echo "$AGE"	 > "$CCPATH"/age.txt
+			echo "$LOCATION" > "$CCPATH"/location.txt
 			if [ ! -z "$OTHERADS" ]; then
-				echo "$OTHERADS" > "$NSCPATH"/"$ID"/otheradurls.txt
+				echo "$OTHERADS" > "$CCPATH"/otheradurls.txt
 			fi
 
 			IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "$NSCPATH"/.ad.txt)`
 			if [ ! -z "$IMGURL" ]; then
-				cd "$NSIPATH"
+				cd "$IPATH"
 				echo downloading images
 				curl -O "{"$IMGURL"}"
 				cd -
@@ -146,7 +150,7 @@ until [ -z "$2" ]; do
 			#  Needs verification of success
 			echo "\""$DATETIME"\",\""$BODY"\","$AGE",\""$LOCATION"\","$ID",0" >> ./content/posting_content_raw.csv
 			BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=;
-		done < "$NSPATH"/"$X"/"$FNAME"_NS.txt
+		done < "$NSUPATH"/"$X"/"$FNAME"_NS.txt
 	done
 	shift
 done
