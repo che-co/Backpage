@@ -18,6 +18,75 @@ clean_var() {
 	RESULT="${RESULT%"${RESULT##*[![:space:]]}"}"
 	echo -n "$RESULT"
 }
+download_content () {	
+	CPATH=""$1"CPATH"
+	UPATH=""$1"UPATH"
+	while read URL; do
+		curl -s "http://"$2".backpage.com/"$URL"" > "$CPATH"/.ad.txt
+		WRITEBODY=0
+		
+		#  Extract posting's body content
+		while read LINE; do
+			grep -q "</div>" <(echo "$LINE")
+			if [ $? -eq 0 -a "$WRITEBODY" -eq 1 ]; then
+				break
+			fi
+			if [ "$WRITEBODY" -eq 1 ]; then
+				BODY="${BODY}""${LINE}"$'\n'
+			fi
+			grep -q "<div class=\"postingBody\">" <(echo "$LINE")
+			if [ $? -eq 0 ]; then
+				WRITEBODY=1
+			fi
+		done < "${!CPATH}"/.ad.txt
+		BODY=`clean_var "${BODY//<br>/ }"`
+		
+		#  Extract date and time of posting
+		DATETIME=`grep -o "[[:upper:]][[:lower:]]\+, [[:upper:]][[:lower:]]\+ [0-9]\+, [0-9]\{4\} [0-9]\+:[0-9]\{2\} [APM]*" "${!CPATH}"/.ad.txt`
+		#  Extract "poster's" age
+		AGE=`grep -oP "(?<=Poster's age: )[0-9]*" "${!CPATH}"/.ad.txt`
+		
+		#  Extract location information
+		LOCATION=`pcregrep -oM "(?<=Location:)\W*?.*\W*?(?=</div)" "${!CPATH}"/.ad.txt`
+		LOCATION=`clean_var "$LOCATION"`
+	
+		#  Extract Post ID to other postings
+		ID=`grep -oP '(?<=Post ID: )[0-9]*' "${!CPATH}"/.ad.txt`
+				
+		#  Extract "Other Ads by this user"
+		OTHERADS=`grep -v "http://"$2".backpage.com/"$URL"" <(grep -o "http://[a-z]\+\./backpage\.com/"$X"/[a-z\-]\+/[0-9]\+" "${!CPATH}"/.ad.txt)`
+		#  Write content to file and download images
+		if [ ! -d "${!CPATH}"/"$X"/"$ID" ]; then
+			mkdir -p "${!CPATH}/"$X""/"$ID"/imgs
+			CCPATH="${!CPATH}"/"$X"/"$ID"
+		else
+			mkdir -p "${!CPATH}"/"$X"/"$ID"\(`ls "${!CPATH}"/"$X" | grep -c "$ID"`\)
+			CCPATH="${!CPATH}"/"$X"/"$ID"\(`ls "${!CPATH}"/"$X" | grep -c "$ID"`\)
+			echo ID: "$ID" already exists and may be duplcated
+		fi
+		echo writing content for "$ID" to "$CCPATH"
+		IPATH="$CCPATH"/imgs
+		echo "$DATETIME" > "$CCPATH"/datetime.txt
+		echo "$BODY"	 > "$CCPATH"/body.txt
+		echo "$AGE"	 > "$CCPATH"/age.txt
+		echo "$LOCATION" > "$CCPATH"/location.txt
+		if [ ! -z "$OTHERADS" ]; then
+			echo "$OTHERADS" > "$CCPATH"/otheradurls.txt
+		fi
+
+		IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "${!CPATH}"/.ad.txt)`
+		if [ ! -z "$IMGURL" ]; then
+			cd "$IPATH"
+			echo writing images for "$ID" to "$IPAH"
+			curl -Os "{"$IMGURL"}"
+			cd - > /dev/null
+		fi
+	
+		#  Needs verification of success
+		echo "\""$DATETIME"\",\""$BODY"\","$AGE",\""$LOCATION"\","$ID",0" >> ./content/posting_content_raw.csv
+		BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=;
+	done < "${!UPATH}"/"$X"/"$FNAME"_NS.txt
+}
 if [ -z "$1" ]; then
 	echo "Error: Posting category or categories not given without defulat"
 	echo "Usage: $0 [category,category,...] [geography] [geography] ..."
@@ -97,71 +166,8 @@ until [ -z "$2" ]; do
 		done 
 #  Download and organize content--I need to functionalize this!
 		echo downloading/extracting non-sponsored content for "$2"/"$X"
-		while read URL; do
-			curl -s "http://"$2".backpage.com/"$URL"" > "$NSCPATH"/.ad.txt
-			WRITEBODY=0
-			
-			#  Extract posting's body content
-			while read LINE; do
-				grep -q "</div>" <(echo "$LINE")
-				if [ $? -eq 0 -a "$WRITEBODY" -eq 1 ]; then
-					break
-				fi
-				if [ "$WRITEBODY" -eq 1 ]; then
-					BODY="${BODY}""${LINE}"$'\n'
-				fi
-				grep -q "<div class=\"postingBody\">" <(echo "$LINE")
-				if [ $? -eq 0 ]; then
-					WRITEBODY=1
-				fi
-			done < "$NSCPATH"/.ad.txt
-			BODY=`clean_var "${BODY//<br>/ }"`
-			
-			#  Extract date and time of posting
-			DATETIME=`grep -o "[[:upper:]][[:lower:]]\+, [[:upper:]][[:lower:]]\+ [0-9]\+, [0-9]\{4\} [0-9]\+:[0-9]\{2\} [APM]*" "$NSCPATH"/.ad.txt`
-			#  Extract "poster's" age
-			AGE=`grep -oP "(?<=Poster's age: )[0-9]*" "$NSCPATH"/.ad.txt`
-			
-			#  Extract location information
-			LOCATION=`pcregrep -oM "(?<=Location:)\W*?.*\W*?(?=</div)" "$NSCPATH"/.ad.txt`
-			LOCATION=`clean_var "$LOCATION"`
-
-			#  Extract Post ID to other postings
-			ID=`grep -oP '(?<=Post ID: )[0-9]*' "$NSCPATH"/.ad.txt`
-			
-			#  Extract "Other Ads by this user"
-			OTHERADS=`grep -v "http://"$2".backpage.com/"$URL"" <(grep -o "http://[a-z]\+\./backpage\.com/"$X"/[a-z\-]\+/[0-9]\+" "$NSCPATH"/.ad.txt)`
-			#  Write content to file and download images
-			if [ ! -d "$NSCPATH"/"$X"/"$ID" ]; then
-				mkdir -p "$NSCPATH/"$X""/"$ID"/imgs
-				CCPATH="$NSCPATH"/"$X"/"$ID"
-			else
-				mkdir -p "$NSCPATH"/"$X"/"$ID"\(`ls "$NSCPATH"/"$X" | grep -c "$ID"`\)
-				CCPATH="$NSCPATH"/"$X"/"$ID"\(`ls "$NSCPATH"/"$X" | grep -c "$ID"`\)
-				echo ID: "$ID" already exists and may be duplcated
-			fi
-			echo writing content for "$ID" to "$CCPATH"
-			IPATH="$CCPATH"/imgs
-			echo "$DATETIME" > "$CCPATH"/datetime.txt
-			echo "$BODY"	 > "$CCPATH"/body.txt
-			echo "$AGE"	 > "$CCPATH"/age.txt
-			echo "$LOCATION" > "$CCPATH"/location.txt
-			if [ ! -z "$OTHERADS" ]; then
-				echo "$OTHERADS" > "$CCPATH"/otheradurls.txt
-			fi
-
-			IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "$NSCPATH"/.ad.txt)`
-			if [ ! -z "$IMGURL" ]; then
-				cd "$IPATH"
-				echo writing images for "$ID" to "$IPAH"
-				curl -Os "{"$IMGURL"}"
-				cd - > /dev/null
-			fi
-
-			#  Needs verification of success
-			echo "\""$DATETIME"\",\""$BODY"\","$AGE",\""$LOCATION"\","$ID",0" >> ./content/posting_content_raw.csv
-			BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=;
-		done < "$NSUPATH"/"$X"/"$FNAME"_NS.txt
+	download_content "NS"
+	download_content "S"
 	done
 	shift
 done

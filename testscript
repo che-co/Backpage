@@ -1,62 +1,72 @@
 #!/bin/bash 
-
 shopt -s extglob
-clean_var() {
-	local RESULT=$1
-	RESULT="${RESULT//[$'\n\t\r\f']/}"
-	RESULT="${RESULT#"${RESULT%%[![:space:]]*}"}"
-	RESULT="${RESULT%"${RESULT##*[![:space:]]}"}"
-	echo -n "$RESULT"
+NSPATH="PBL"
+SPATH="LBP"
+foo () {
+PATH=""$1"PATH"
+echo ${!PATH}
 }
-if [ ! -e foo.csv ]; then
-  echo DATETIME,BODY,AGE,LOCATION,ID,ADTYPE > ./foo.csv
-fi
-for AD in ./page.html ./page2.html; do
-  WRITEBODY=0
-  while read LINE; do
-    grep -q "</div>" <(echo "$LINE")
-	if [ $? -eq 0 -a "$WRITEBODY" -eq 1 ]; then
-		break
-	fi
-	if [ "$WRITEBODY" -eq 1 ]; then
-		BODY="${BODY}""${LINE}"$'\n'
-	fi
-	grep -q "<div class=\"postingBody\">" <(echo "$LINE")
-	if [ $? -eq 0 ]; then
-		WRITEBODY=1
-	fi
-  done < "$AD"
-  BODY="${BODY//+([$'\n\r\t']|<br>)/ }"
-  DATETIME=`grep -o "[[:upper:]][[:lower:]]\+, [[:upper:]][[:lower:]]\+ [0-9]\+, [0-9]\{4\} [0-9]\+:[0-9]\{2\} [APM]*" "$AD"`
-  AGE=`grep -oP "(?<=Poster's age: )[0-9]*"  "$AD"`
-  LOCATION=`pcregrep -oM "(?<=Location:)\W*?.*\W*?(?=</div)" "$AD"`
-  LOCATION=`clean_var "$LOCATION"`
-  echo '1)='"$LOCATION"=
-  ID=`grep -oP '(?<=Post ID: )[0-9]*' "$AD"`
-  OTHERADS=`grep -v "http://albuquerque.backpage.com/MaleEscorts/muscular-stud-available-sexy-face-nice-body-great-skills-incall/7799581" <(grep -o "http://[a-z]\+\./backpage\.com/[a-z]*/[a-z\-]\+/[0-9]\+" "$AD")`
-  if [ ! -d conte/"$ID" ]; then
-     mkdir -p conte/"$ID"/img
-  fi
-  NSIPATH=conte/"$ID"/imgs
-			
-  echo "$DATETIME" > conte/"$ID"/datetime.txt
-  echo "$BODY"	 > conte/"$ID"/body.txt
-  echo "$AGE"	 > conte/"$ID"/age.txt
-  echo "$LOCATION" > conte/"$ID"/location.txt
-  if [ ! -z "$OTHERADS" ]; then
-	echo "$OTHERADS" > conte/"$ID"/otheradurls.txt
-  fi
 
-  IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "$AD")`
-  if [ ! -z "$IMGURL" ]; then
-    cd "$NSIPATH"
-    for I in 1 2; do
-      touch img_"$I".jpg
-    done
-  fi
-  echo "\""$DATETIME"\",\""$BODY"\","$AGE",\""$LOCATION"\","$ID",0" >> ./foo.csv
-  BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=;
-done
+foo "NS"
+echo
+foo "S"
+
+#clean_var() {
+#	local RESULT=$1
+#	RESULT="${RESULT//[$'\n\t\r\f']/}"
+#	RESULT="${RESULT#"${RESULT%%[![:space:]]*}"}"
+#	RESULT="${RESULT%"${RESULT##*[![:space:]]}"}"
+#	echo -n "$RESULT"
+#}
+#if [ ! -e foo.csv ]; then
+#  echo DATETIME,BODY,AGE,LOCATION,ID,ADTYPE > ./foo.csv
+#fi
+#for AD in ./page.html ./page2.html; do
+#  WRITEBODY=0
+#  while read LINE; do
+#    grep -q "</div>" <(echo "$LINE")
+#	if [ $? -eq 0 -a "$WRITEBODY" -eq 1 ]; then
+#		break
+#	fi
+#	if [ "$WRITEBODY" -eq 1 ]; then
+#		#BODY="${BODY}""${LINE}"$'\n'
+#	fi
+#	grep -q "<div class=\"postingBody\">" <(echo "$LINE")
+#	if [ $? -eq 0 ]; then
+#		WRITEBODY=1
+#	fi
+ # done < "$AD"
+# BODY="${BODY//+([$'\n\r\t']|<br>)/ }"
+#  DATETIME=`grep -o "[[:upper:]][[:lower:]]\+, [[:upper:]][[:lower:]]\+ [0-9]\+, [0-9]\{4\} [0-9]\+:[0-9]\{2\} [APM]*" "$AD"`
+#  AGE=`grep -oP "(?<=Poster's age: )[0-9]*"  "$AD"`
+#  LOCATION=`pcregrep -oM "(?<=Location:)\W*?.*\W*?(?=</div)" "$AD"`
+#  LOCATION=`clean_var "$LOCATION"`
+#  echo '1)='"$LOCATION"=
+#  ID=`grep -oP '(?<=Post ID: )[0-9]*' "$AD"`
+#  OTHERADS=`grep -v "http://albuquerque.backpage.com/MaleEscorts/muscular-stud-available-sexy-face-nice-body-great-skills-incall/7799581" <(grep -o "http://[a-z]\+\./backpage\.com/[a-z]*/[a-z\-]\+/[0-9]\+" "$AD")`
+#  if [ ! -d conte/"$ID" ]; then
+#     mkdir -p conte/"$ID"/img
+#  fi
+#  NSIPATH=conte/"$ID"/imgs
+#			
+#  echo "$DATETIME" > conte/"$ID"/datetime.txt
+#  echo "$BODY"	 > conte/"$ID"/body.txt
+#  echo "$AGE"	 > conte/"$ID"/age.txt
+#  echo "$LOCATION" > conte/"$ID"/location.txt
+#  if [ ! -z "$OTHERADS" ]; then
+#	echo "$OTHERADS" > conte/"$ID"/otheradurls.txt
+#  fi
+
+#  IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "$AD")`
+#  if [ ! -z "$IMGURL" ]; then
+#    cd "$NSIPATH"
+#    for I in 1 2; do
+#      touch img_"$I".jpg
+#    done
+#  fi
+#  echo "\""$DATETIME"\",\""$BODY"\","$AGE",\""$LOCATION"\","$ID",0" >> ./foo.csv
+#  BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=;
+#done
 
 #echo "\<div\ class=\"postingBody\"\>[\n\s.]*[[:^alnum:][:alnum:]]*?(?!\<\/div\>)"; echo
 
