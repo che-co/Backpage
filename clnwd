@@ -1,0 +1,6 @@
+#!/bin/bash
+
+rm -rf ./URLs
+rm -rf ./content
+
+exit $?

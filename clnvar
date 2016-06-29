@@ -1,0 +1,16 @@
+#!/bin/bash
+#  This script is used to remove leading and trailing
+#+ whitespace and newlines from data scraped using dlcnt.sh
+
+if [ -z "$1" ]; then
+  echo "$0": no argument given
+  echo Usage: "$0" \"$VAR\"
+  exit 1
+fi
+
+RESULT="${1//[$'\n\t\r\f']/}"
+RESULT="${RESULT#"${RESULT%%[![:space:]]*}"}"
+RESULT="${RESULT%"${RESULT##*[![:space:]]}"}"
+echo -n "$RESULT"
+
+exit $?
