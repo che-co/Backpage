@@ -1,5 +1,4 @@
-#!/bin/bash 
-shopt -s extglob 
+#!/bin/bash  
 
 #  To-do: 
 #  (1) Prevent URLS that have already been downloaded from being repeated
@@ -7,6 +6,8 @@ shopt -s extglob
 #  Author: Sergio "Checo" Gonzales
 #  Date: 07-29-2016
 #  This can be used to scrape the backpage.com
+
+E_WRONG_ARG=85
 
 if [ -z "$1" ]; then
   echo "Error: Posting category or categories not given without defulat"
@@ -21,7 +22,7 @@ if [ -z "$2" ]; then
 fi
 
 CATEGORY="$1,"
-DATE=`date +%d-%m-%Y`
+DATE=`date +%d%m%Y_%H%M%S`
 
 #  Scrape topics
 until [ -z "$2" ]; do
@@ -49,8 +50,8 @@ until [ -z "$2" ]; do
     if [ ! -d "$SCPATH" ]; then
       mkdir -p "$SCPATH"
     fi
-    if [ ! -e ./content/"$2"/"$X"/posting_content_raw.csv -o -s ./content/"$2"/"$X"/posting_content_raw.csv ]; then
-      echo DATTIME,BODY,AGE,LOCATION,ID,ADTYPE > ./content/"$2"/"$X"/posting_content_raw.csv
+    if [ ! -e ./content/"$2"/"$X"/posting_content_raw.csv -o ! -s ./content/"$2"/"$X"/posting_content_raw.csv ]; then
+      echo DATTIME,BODY,AGE,LOCATION,ID,ADTYPE,URL > ./content/"$2"/"$X"/posting_content_raw.csv
     fi
 
     until [ "$PAGE" -gt 444 ]; do
@@ -61,42 +62,43 @@ until [ -z "$2" ]; do
 	break
       fi
    #  Find every posting and sponsord URLs on currnet page
-      grep -v "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$NSUPATH"/."$FNAME"_NS.txt
-      exNS=$?
-      if [ $exNS -ne 0 ]; then
-        echo warning: "$0": non-sponsored content not found on ""$2".backpage.com/"$X"/&page="$PAGE""
+      grep -v "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$NSUPATH"/.NS.txt
+      grep "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SUPATH"/.S.txt
+      if [ ! -s "$SUPATH"/.S.txt -a ! -s "$NSUPATH"/.NS.txt ]; then 
+         echo "$0": no relevent URLs and content found on page ""$2".backpage.com/"$X"/&page="$PAGE"" \(perhaps it\'s a typo\)
+         exit $E_WRONG_ARG
       fi
-      grep "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SUPATH"/."$FNAME"_S.txt
-      exS=$?
-      if [ $exS -ne 0 ]; then 
-        echo warning: "$0": sponsored content not found on ""$2".backpage.com/"$X"/&page="$PAGE""
+      if [ ! -s "$SUPATH"/.S.txt ]; then 
+        echo warning: "$0": sponsored content not found on ""$2".backpage.com/"$X"/&page="$PAGE"" >&2
       fi
-      if [ $exNS -ne 0 -a $exS -ne 0 ]; then
-         echo "$0": no content found on page ""$2".backpage.com/"$X"/&page="$PAGE"" \(maybe you have a typo\)
-         exit 1
+      if [ ! -s "$NSUPATH"/.NS.txt ]; then
+        echo warning: "$0": non-sponsored content not found on ""$2".backpage.com/"$X"/&page="$PAGE"" >&2
       fi
+
       if [ `ls -A -1 "$NSUPATH"/ | wc -l` -le 1 ]; then 
-        mv "$NSUPATH"/."$FNAME"_NS.txt "$NSUPATH"/"$FNAME"_NS.txt
+        mv "$NSUPATH"/.NS.txt "$NSUPATH"/"$FNAME"_NS.txt
       else
-        sort -u "$NSUPATH"/."$FNAME"_NS.txt `ls -A -d  "$NSUPATH"/*` > "$NSUPATH"/"$FNAME"_NS.txt
-        rm "$NSUPATH"/."$FNAME"_NS.txt
+        sort -u "$NSUPATH"/.NS.txt `ls -A -d  "$NSUPATH"/*` > "$NSUPATH"/._NS.txt
+        comm -23 "$NSUPATH"/._NS.txt "$NSUPATH"/.NS.txt > "$NSUPATH"/"$FNAME"_NS.txt 
+        rm "$NSUPATH"/.NS.txt "$NSUPATH"/._NS.txt
       fi
       if [ `ls -A -1 "$SUPATH"/ | wc -l` -le 1 ]; then
-	mv "$SUPATH"/."$FNAME"_S.txt "$SUPATH"/"$FNAME"_S.txt
+	mv "$SUPATH"/.S.txt "$SUPATH"/"$FNAME"_S.txt
       else
-	sort -u "$SUPATH"/."$FNAME"_S.txt `ls -A -d "$SUPATH"/*` > "$SUPATH"/"$FNAME"_S.txt
-	rm "$SUPATH"/."$FNAME"_S.txt
+	sort -u "$SUPATH"/.S.txt `ls -A -d "$SUPATH"/*` > "$SUPATH"/._S.txt
+        comm -23 "$SUPATH"/._S.txt "$SUPATH"/.S.txt > "$SUPATH"/"$FNAME"_S.txt
+        rm "$SUPATH"/.S.txt "$SUPATH"/._S.txt
       fi
 			
       ((PAGE+=1))
     done 
-#  Download and organize content--I need to functionalize this!
+    
     ./dlcnt "NS" "$2" "$X" "$FNAME"
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 -a $? -ne 44 ]; then
        exit $?
     fi
     ./dlcnt "S" "$2" "$X" "$FNAME"
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 -a $? -ne 44 ]; then
        exit $?
     fi 
   done

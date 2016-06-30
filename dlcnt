@@ -1,43 +1,49 @@
-#!/bin/bash
+#!/bin/bash 
 #  This script is used to download and extract page content
 #+ scraped using scraper.sh
 #  Usage: dlcnt ["NS" "S"] geography category URLfileaname
 
 E_WRONG_ARGS=85
+E_EMPTY_PATH=84
+E_EMPTY_CONTENT=44
 
 if [ "$1" != "NS" -a "$1" != "S" ]; then
-  echo "$0": content type incorrectly specified
-  echo Usage: "$0" ["NS" "S"] geography category URLfilename
+  echo "`basename "$0"`: content type incorrectly specified" >&2
+  echo Usage: "$0" ["NS" "S"] geography category URLfilename >&2
   exit "$E_WRONG_ARGS"
 fi
 if [ -z "$2" ]; then
-  echo "$0": geography not specified
-  echo Usage: "$0" ["NS" "S"] geography category URLfilename
+  echo "`basename "$0"`: geography not specified" >&2
+  echo Usage: "$0" ["NS" "S"] geography category URLfilename >&2
   exit "$E_WRONG_ARGS"
 fi
 if [ -z "$3" ]; then
-  echo "$0": category not specified
-  echo Usage: "$0" ["NS" "S"] geography category URLfilename
+  echo "`basename "$0"`: category not specified" >&2
+  echo Usage: "$0" ["NS" "S"] geography category URLfilename >&2
   exit "$E_WRONG_ARGS"
 fi
 if [ -z "$4" ]; then
-  echo "$0": URLfilename not specified
-  echo Usage: "$0" ["NS" "S"] geography category URLfilename
+  echo "`basename "$0"`: URLfilename not specified" >&2
+  echo Usage: "$0" ["NS" "S"] geography category URLfilename >&2
   exit "$E_WRONG_ARGS"
 fi
-
 CPATH=""$1"CPATH"
 UPATH=""$1"UPATH"
 GEOG="$2"
 if [ -z "${!CPATH}" ]; then
-  echo "$0": content path not set
-  exit 1
+  echo "`basename "$0"`": content path not set >&2
+  exit $E_EMPTY_PATH
 fi
 
 if [ -z "${!UPATH}" ]; then
-  echo "$0": URL path not set
-  exit 1
+  echo "`basename "$0"`: URL path not set" >&2
+  exit $E_EMPTY_PATH
 fi
+if [ ! -s "${!UPATH}"/"$4"_"$1".txt ]; then
+  echo "${!UPATH}"/"$4"_"$1".txt is empty\; no new content exists to download
+  exit 0
+fi
+
 if [ "$1" == "S" ]; then
   CTYPE=1
 else
@@ -45,7 +51,7 @@ else
 fi
 
 while read URL; do
-  curl -s "http://"$GEOG".backpage.com/"$URL"" > "${!CPATH}"/.ad.txt
+  curl -s "http://"$GEOG".backpage.com"$URL"" > "${!CPATH}"/.ad.txt
   WRITEBODY=0
 	
   #  Extract posting's body content
@@ -63,7 +69,7 @@ while read URL; do
     fi
   done < "${!CPATH}"/.ad.txt
   BODY=`./clnvar "${BODY//<br>/ }"`
-
+  
   #  Extract date and time of posting
   DATETIME=`grep -o "[[:upper:]][[:lower:]]\+, [[:upper:]][[:lower:]]\+ [0-9]\+, [0-9]\{4\} [0-9]\+:[0-9]\{2\} [APM]*" "${!CPATH}"/.ad.txt`
   #  Extract "poster's" age
@@ -76,7 +82,11 @@ while read URL; do
   #  Extract Post ID to other postings
   ID=`grep -oP '(?<=Post ID: )[0-9]*' "${!CPATH}"/.ad.txt`
 		
-  #  Extract "Other Ads by this user"
+  if [ -z "$BODY" -o -z "$DATETIME" -o -z "$AGE" -o -z "$ID" ]; then
+    echo "`basename "$0"`: some or all of the minumum expected content was not found for \"http://"$GEOG".backpage.com"$URL"\"" >&2
+    exit $E_EMPTY_CONTENT
+  fi
+ #  Extract "Other Ads by this user"
   OTHERADS=`grep -v "http://"$GEOG".backpage.com/"$URL"" <(grep -o "http://[a-z]\+\./backpage\.com/"$3"/[a-z\-]\+/[0-9]\+" "${!CPATH}"/.ad.txt)`
 
   #  Write content to file and download images
@@ -85,8 +95,8 @@ while read URL; do
     CCPATH="${!CPATH}"/"$ID"
   else
     CCPATH="${!CPATH}"/"$ID"\(`ls "${!CPATH}" | grep -c "$ID"`\)
-    mkdir -p "${!CPATH}"/"$ID"\(`ls "${!CPATH}" | grep -c "$ID"`\)
-    echo ID: "$ID" already exists and may be duplcated
+    mkdir -p "${!CPATH}"/"$ID"\(`ls "${!CPATH}" | grep -c "$ID"`\)/imgs
+    echo "$3" ID: "$ID" already exists and may be duplcated
   fi
 
   IPATH="$CCPATH"/imgs
@@ -95,6 +105,7 @@ while read URL; do
   echo "$BODY"	 > "$CCPATH"/body.txt
   echo "$AGE"	 > "$CCPATH"/age.txt
   echo "$LOCATION" > "$CCPATH"/location.txt
+  echo http://"$GEOG".backpage.com"$URL" > "$CCPATH"/url.txt
   if [ ! -z "$OTHERADS" ]; then
     echo "$OTHERADS" > "$CCPATH"/otheradurls.txt
   fi
@@ -108,9 +119,9 @@ while read URL; do
   fi
   
   echo writing contents for "$ID" to "$CCPATH"
-  echo "\""$DATETIME"\",\""$BODY"\","$AGE",\""$LOCATION"\","$ID","$CTYPE"" >> ./content/"$GEOG"/"$3"/posting_content_raw.csv
- 
-  BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=;
-done < "${!UPATH}"/"$4"_"$1".txt
+  echo "\""$DATETIME"\",\""$BODY"\","$AGE",\""$LOCATION"\","$ID","$CTYPE",http://"$GEOG".backpage.com"$URL"" >> ./content/"$GEOG"/"$3"/posting_content_raw.csv
 
+  BODY=;DATETIME=;AGE=;LOCATION=;ID=;OTHERADS=;IMGURL=
+done < "${!UPATH}"/"$4"_"$1".txt
+sleep 10
 exit $?

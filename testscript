@@ -1,15 +1,19 @@
 #!/bin/bash 
-shopt -s extglob
-NSPATH="PBL"
-SPATH="LBP"
-foo () {
-PATH=""$1"PATH"
-echo ${!PATH}
-}
+#shopt -s extglob
 
-foo "NS"
-echo
-foo "S"
+echo "err" >&2
+
+exit 1
+#NSPATH="PBL"
+#SPATH="LBP"
+#foo () {
+#PATH=""$1"PATH"
+#echo ${!PATH}
+#}
+
+#foo "NS"
+#echo
+#foo "S"
 
 #clean_var() {
 #	local RESULT=$1
