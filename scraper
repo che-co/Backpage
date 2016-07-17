@@ -4,7 +4,7 @@
 #  (1) Prevent URLS that have already been downloaded from being repeated
 
 #  Author: Sergio "Checo" Gonzales
-#  Date: 07-29-2016
+#  Date: 07-17-2016
 #  This can be used to scrape the backpage.com
 
 E_WRONG_ARG=85
@@ -12,13 +12,13 @@ E_WRONG_ARG=85
 if [ -z "$1" ]; then
   echo "Error: Posting category or categories not given without defulat"
   echo "Usage: $0 [category,category,...] [geography] [geography] ..."
-  exit 1
+  exit $E_WRONG_ARGS 
 fi
 
 if [ -z "$2" ]; then
   echo "Error: Geography or georgraphies not given without default"
   echo "Usage: $0 [category,category,...] [geography] [geography] ..."
-  exit 1 
+  exit $E_WRONG_ARGS 
 fi
 
 CATEGORY="$1,"
@@ -66,7 +66,7 @@ until [ -z "$2" ]; do
       grep "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SUPATH"/.S.txt
       if [ ! -s "$SUPATH"/.S.txt -a ! -s "$NSUPATH"/.NS.txt ]; then 
          echo "$0": no relevent URLs and content found on page ""$2".backpage.com/"$X"/&page="$PAGE"" \(perhaps it\'s a typo\)
-         exit $E_WRONG_ARG
+         exit 1
       fi
       if [ ! -s "$SUPATH"/.S.txt ]; then 
         echo warning: "$0": sponsored content not found on ""$2".backpage.com/"$X"/&page="$PAGE"" >&2
