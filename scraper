@@ -1,84 +1,84 @@
 #!/bin/bash  
 
 #  To-do: 
-#  (1) Problem with Error codes... 525, 401-404, maybe more
+#  (1) Problem with Error codes... 5XX, 401-404, maybe more
 #  (2) Stop downloading redundant pages
 #  (3) Parallelize sponsored and non-sponsored scripts
+#  (4) Finish GREP_OPT problem
 
 #  Author: Sergio "Checo" Gonzales
 #  Date: 07-17-2016
-#  This can be used to scrape the backpage.com
+#  This was designed to scrape the escort ads of backpage.com
 
-ERR_525_TIME_OUT=6
+ERR_5XX_TIME_OUT=6
 OTHER_FAILURE_TIME_OUT=6
 E_WRONG_ARG=85
-
-if [ -z "$1" ]; then
-  echo "Error: Posting category or categories not given without defulat"
-  echo "Usage: $0 [category,category,...] [geography] [geography] ..."
+if [ -z "$1" ] || [ "${1:2:1}" != "u" -a ! -z "${1:2:1}" ]; then
+  echo "`basename "$0"`: Error: mandiroty options incorrectly specified" >&2
+  echo "Usage: $0 -[ns] [category,category,...] [geography] [geography] ..."
   exit $E_WRONG_ARGS 
 fi
-
 if [ -z "$2" ]; then
-  echo "Error: Geography or georgraphies not given without default"
-  echo "Usage: $0 [category,category,...] [geography] [geography] ..."
+  echo "`basename "$0"`:Error: Posting category or categories not given without defulat" >&2
+  echo "Usage: $0 -[nst] [category,category,...] [geography] [geography] ..."
   exit $E_WRONG_ARGS 
 fi
 
+if [ -z "$3" ]; then
+  echo "`basename "$0"`:Error: Geography or georgraphies not given without default" >&2
+  echo "Usage: $0 -[nst] [category,category,...] [geography] [geography] ..."
+  exit $E_WRONG_ARGS 
+fi
+
+if [ "${1:1:1}" = "n" ]; then
+  TYPE="non-sponsored"
+  GREP_OPT=""
+elif [ "${1:1:1}" = "s"]; then
+  TYPE="sponsored"
+  GREP_OPT="-v"
+else
+  echo "`basename "$0"`: non-parrallel scraping of non/sponsored content not supported"
+  exit $E_WRONG_ARG
+fi 
 CATEGORY="$1,"
 DATE=`date +%d%m%Y_%H%M%S`
-
-grep-urls () {
-  local PG="$1"/"$2"_pg"$3".html
-  #  Find every posting and sponsord URLs on currnet page
-  grep -v "sponsorBoxPlusImages" "$PG" | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$4"/.NS.txt
-  grep "sponsorBoxPlusImages" "$PG" | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$5"/.S.txt
-}
 
 #  Scrape topics
 until [ -z "$2" ]; do
   for X in `eval echo {$CATEGORY}`; do
-    export SUPATH=./URLs/"$2"/"$X"/sponsored
-    export NSUPATH=./URLs/"$2"/"$X"/non-sponsored
+    export UPATH=./URLs/"$2"/"$X"/"$TYPE"
     export PPATH=./.pages/"$2"/"$X"
-    export NSCPATH=./content/"$2"/"$X"/non-sponsored
-    export SCPATH=./content/"$2"/"$X"/sponsored
+    export CPATH=./content/"$2"/"$X"/"$TYPE"
     PAGE=1
-    FNAME="URLs_"$2"_"$X"_"$DATE""
+    FNAME=""$2"_"$X"_"$DATE""
 
-    if [ ! -d "$NSUPATH" ]; then
-      mkdir -p "$NSUPATH"
-    fi
-    if [ ! -d "$SUPATH" ]; then
-      mkdir -p "$SUPATH"
+    if [ ! -d "$UPATH" ]; then
+      mkdir -p "$UPATH"
     fi   
     if [ ! -d "$PPATH" ]; then
       mkdir -p "$PPATH"
     fi
-    if [ ! -d "$NSCPATH" ]; then
-      mkdir -p "$NSCPATH"
-    fi
-    if [ ! -d "$SCPATH" ]; then
-      mkdir -p "$SCPATH"
+    if [ ! -d "$CPATH" ]; then
+      mkdir -p "$CPATH"
     fi
     if [ ! -e ./content/"$2"/"$X"/posting_content_raw.csv -o ! -s ./content/"$2"/"$X"/posting_content_raw.csv ]; then
       echo DATTIME,BODY,AGE,LOCATION,ID,ADTYPE,URL > ./content/"$2"/"$X"/posting_content_raw.csv
     fi
 
-    until [ "$PAGE" -gt 40 ]; do
-      ERR_525_COUNT=0
+    until [ "$PAGE" -gt 444 ]; do
+      ERR_5XX_COUNT=0
       FAILURES=0
-      echo downloading URLs for "$2"/"$X"/page"$PAGE"
-      curl -s ""$2".backpage.com/"$X"/&page="$PAGE"" > "$PPATH"/"$FNAME"_pg"$PAGE".html
-      grep -q  "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$FNAME"_pg"$PAGE".html
+      echo downloading "$TYPE" URLs from: ""$2".backpage.com/"$X"/&page="$PAGE""
+      curl -s ""$2".backpage.com/"$X"/&page="$PAGE"" > "$PPATH"/"$FNAME"_pg"$PAGE"
+      grep -q  "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$FNAME"_pg"$PAGE"
       if [ $? -eq 0 ]; then
 	break
       fi
      
-      until [ -s "$SUPATH"/.S.txt -a -s "$NSUPATH"/.NS.txt ]; do
-         grep-urls "$PPATH" "$FNAME" "$PAGE" "$NSUPATH" "$SUPATH"
-         ERR=`grep -o "Error [0-9]*" "$PPATH"/"$FNAME"_pg"$PAGE".html`
-         if [ ! -z $ERR ]; then
+      grep "$GREP_OPT" "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE" | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$UPATH"/.urls
+
+         ERR=`grep -o "Error [0-9]*" "$PPATH"/"$FNAME"_pg"$PAGE"`
+         if [ ! -z "$ERR" ]; then
            echo "`basename "$0"`: HTTP request $ERR: trying again" >&2
            sleep 5
            ((ERR_525_COUNT+=1))
@@ -92,30 +92,30 @@ until [ -z "$2" ]; do
          fi
          ((FAILURES+=1))
       done
-      if [ ! -s "$SUPATH"/.S.txt -a ! -s "$NSUPATH"/.NS.txt ]; then
+      if [ ! -s "$SUPATH"/.S -a ! -s "$NSUPATH"/.NS ]; then
         echo "`basename "$0"`: error: no relevant content found on "$2".backpage.com/"$X"/&page="$PAGE"" >&2
         break 2
       fi
-      if [ ! -s "$SUPATH"/.S.txt ]; then 
+      if [ ! -s "$SUPATH"/.S ]; then 
         echo "`basename "$0"`: warning: sponsored content not found on "$2".backpage.com/"$X"/&page="$PAGE"" >&2
       fi
-      if [ ! -s "$NSUPATH"/.NS.txt ]; then
+      if [ ! -s "$NSUPATH"/.NS ]; then
         echo "`basename "$0"`: non-sponsored content not found on "$2".backpage.com/"$X"/&page="$PAGE"" >&2
       fi
 
       if [ `ls -A -1 "$NSUPATH"/ | wc -l` -le 1 ]; then 
-        mv "$NSUPATH"/.NS.txt "$NSUPATH"/"$FNAME"_NS.txt
+        mv "$NSUPATH"/.NS "$NSUPATH"/"$FNAME"_NS
       else
-        sort -u "$NSUPATH"/.NS.txt `ls -A -d  "$NSUPATH"/*` > "$NSUPATH"/._NS.txt
-        comm -23 "$NSUPATH"/._NS.txt "$NSUPATH"/.NS.txt > "$NSUPATH"/"$FNAME"_NS.txt 
-        rm "$NSUPATH"/.NS.txt "$NSUPATH"/._NS.txt
+        sort -u "$NSUPATH"/.NS `ls -A -d  "$NSUPATH"/*` > "$NSUPATH"/._NS
+        comm -23 "$NSUPATH"/._NS "$NSUPATH"/.NS > "$NSUPATH"/"$FNAME"_NS 
+        rm "$NSUPATH"/.NS "$NSUPATH"/._NS
       fi
       if [ `ls -A -1 "$SUPATH"/ | wc -l` -le 1 ]; then
-	mv "$SUPATH"/.S.txt "$SUPATH"/"$FNAME"_S.txt
+	mv "$SUPATH"/.S "$SUPATH"/"$FNAME"_S
       else
-	sort -u "$SUPATH"/.S.txt `ls -A -d "$SUPATH"/*` > "$SUPATH"/._S.txt
-        comm -23 "$SUPATH"/._S.txt "$SUPATH"/.S.txt > "$SUPATH"/"$FNAME"_S.txt
-        rm "$SUPATH"/.S.txt "$SUPATH"/._S.txt
+	sort -u "$SUPATH"/.S `ls -A -d "$SUPATH"/*` > "$SUPATH"/._S
+        comm -23 "$SUPATH"/._S "$SUPATH"/.S > "$SUPATH"/"$FNAME"_S
+        rm "$SUPATH"/.S "$SUPATH"/._S
       fi
 			
       ((PAGE+=1))
