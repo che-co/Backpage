@@ -76,7 +76,7 @@ while read URL; do
   AGE=`grep -oP "(?<=Poster's age: )[0-9]*" "${!CPATH}"/.ad.txt`
 
   #  Extract location information
-  LOCATION=`pcregrep -oM "(?<=Location:)\W*?.*\W*?(?=</div)" "${!CPATH}"/.ad.txt`
+  LOCATION=`grep -A1 "Location:" "${!CPATH}"/.ad.txt| tail -1`
   LOCATION=`./clnvar "$LOCATION"`
 
   #  Extract Post ID to other postings
@@ -109,8 +109,8 @@ while read URL; do
   if [ ! -z "$OTHERADS" ]; then
     echo "$OTHERADS" > "$CCPATH"/otheradurls.txt
   fi
-
-  IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "${!CPATH}"/.ad.txt)`
+  mv "${!CPATH}"/.ad.txt "$CCPATH"/ad.txt
+  IMGURL=`paste -sd, <(grep -Po '(?<=(img src="))[^ ]*(?=")' "$CCPATH"/ad.txt)`
   if [ ! -z "$IMGURL" ]; then
     cd "$IPATH"
     echo writing pictures for "$ID" to "$IPATH"

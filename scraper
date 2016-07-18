@@ -1,12 +1,16 @@
 #!/bin/bash  
 
 #  To-do: 
-#  (1) Prevent URLS that have already been downloaded from being repeated
+#  (1) Problem with Error codes... 525, 401-404, maybe more
+#  (2) Stop downloading redundant pages
+#  (3) Parallelize sponsored and non-sponsored scripts
 
 #  Author: Sergio "Checo" Gonzales
 #  Date: 07-17-2016
 #  This can be used to scrape the backpage.com
 
+ERR_525_TIME_OUT=6
+OTHER_FAILURE_TIME_OUT=6
 E_WRONG_ARG=85
 
 if [ -z "$1" ]; then
@@ -23,6 +27,13 @@ fi
 
 CATEGORY="$1,"
 DATE=`date +%d%m%Y_%H%M%S`
+
+grep-urls () {
+  local PG="$1"/"$2"_pg"$3".html
+  #  Find every posting and sponsord URLs on currnet page
+  grep -v "sponsorBoxPlusImages" "$PG" | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$4"/.NS.txt
+  grep "sponsorBoxPlusImages" "$PG" | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$5"/.S.txt
+}
 
 #  Scrape topics
 until [ -z "$2" ]; do
@@ -54,25 +65,42 @@ until [ -z "$2" ]; do
       echo DATTIME,BODY,AGE,LOCATION,ID,ADTYPE,URL > ./content/"$2"/"$X"/posting_content_raw.csv
     fi
 
-    until [ "$PAGE" -gt 444 ]; do
+    until [ "$PAGE" -gt 40 ]; do
+      ERR_525_COUNT=0
+      FAILURES=0
       echo downloading URLs for "$2"/"$X"/page"$PAGE"
       curl -s ""$2".backpage.com/"$X"/&page="$PAGE"" > "$PPATH"/"$FNAME"_pg"$PAGE".html
       grep -q  "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$FNAME"_pg"$PAGE".html
       if [ $? -eq 0 ]; then
 	break
       fi
-   #  Find every posting and sponsord URLs on currnet page
-      grep -v "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$NSUPATH"/.NS.txt
-      grep "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE".html | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$SUPATH"/.S.txt
-      if [ ! -s "$SUPATH"/.S.txt -a ! -s "$NSUPATH"/.NS.txt ]; then 
-         echo "$0": no relevent URLs and content found on page ""$2".backpage.com/"$X"/&page="$PAGE"" \(perhaps it\'s a typo\)
-         exit 1
+     
+      until [ -s "$SUPATH"/.S.txt -a -s "$NSUPATH"/.NS.txt ]; do
+         grep-urls "$PPATH" "$FNAME" "$PAGE" "$NSUPATH" "$SUPATH"
+         ERR=`grep -o "Error [0-9]*" "$PPATH"/"$FNAME"_pg"$PAGE".html`
+         if [ ! -z $ERR ]; then
+           echo "`basename "$0"`: HTTP request $ERR: trying again" >&2
+           sleep 5
+           ((ERR_525_COUNT+=1))
+           if [ $ERR_525_COUNT -eq $ERR_525_TIME_OUT ]; then
+             echo "`basename "$0"`: warning: HTTP $ERR: skipping page "$2".backpage.com/"$X"/&page="$PAGE"" >&2
+             continue
+           fi
+         fi
+         if [ $OTHER_FAILURE_TIME_OUT -eq $FAILURES ]; then
+           echo "`basename "$0"`: error: failure in get-urls()"
+         fi
+         ((FAILURES+=1))
+      done
+      if [ ! -s "$SUPATH"/.S.txt -a ! -s "$NSUPATH"/.NS.txt ]; then
+        echo "`basename "$0"`: error: no relevant content found on "$2".backpage.com/"$X"/&page="$PAGE"" >&2
+        break 2
       fi
       if [ ! -s "$SUPATH"/.S.txt ]; then 
-        echo warning: "$0": sponsored content not found on ""$2".backpage.com/"$X"/&page="$PAGE"" >&2
+        echo "`basename "$0"`: warning: sponsored content not found on "$2".backpage.com/"$X"/&page="$PAGE"" >&2
       fi
       if [ ! -s "$NSUPATH"/.NS.txt ]; then
-        echo warning: "$0": non-sponsored content not found on ""$2".backpage.com/"$X"/&page="$PAGE"" >&2
+        echo "`basename "$0"`: non-sponsored content not found on "$2".backpage.com/"$X"/&page="$PAGE"" >&2
       fi
 
       if [ `ls -A -1 "$NSUPATH"/ | wc -l` -le 1 ]; then 
