@@ -1,4 +1,4 @@
-#!/bin/bash -x 
+#!/bin/bash -x  
 
 #  To-do: 
 #  (1) Problem with Error codes... 5XX, 401-404, maybe more
@@ -6,48 +6,71 @@
 #  (3) Parallelize sponsored and non-sponsored scripts
 #+     -needs to be integreated with dlcnt.sh
 #  (4) Add option to contiue past duplicated URLS
+#  (5) Fix curl call and sterr option
 
 #  Author: Sergio "Checo" Gonzales
-#  Date: 07-17-2016
+#  Date: 07-19-2016
 #  This was designed to scrape the escort ads of backpage.com
 
 #  Some configuation variables and error codes
 TIME_OUT=6
 SLEEP=5
 E_WRONG_ARG=85
-OPTS="$1"
+OPTS="${1:1}"
 
 #  Usage errors
 if [ -z "$OPTS" ] || [ "${OPTS:2:1}" != "u" -a ! -z "${OPTS:2:1}" ]; then
   echo "`basename "$0"`: Error: mandiroty options incorrectly specified" >&2
-  echo "Usage: $0 -[nsu] [category,category,...] [geography] [geography] ..."
+  echo "Usage: $0 -[cnsul[file]] [category,category,...] [geography] [geography] ..."
   exit $E_WRONG_ARGS 
 fi
 if [ -z "$2" ]; then
   echo "`basename "$0"`:Error: Posting category or categories not given without defulat" >&2
-  echo "Usage: $0 -[nsu] [category,category,...] [geography] [geography] ..."
+  echo "Usage: $0 -[cnsul[file]] [category,category,...] [geography] [geography] ..."
   exit $E_WRONG_ARGS 
 fi
 
 if [ -z "$3" ]; then
   echo "`basename "$0"`:Error: Geography or georgraphies not given without default" >&2
-  echo "Usage: $0 -[nsu] [category,category,...] [geography] [geography] ..."
+  echo "Usage: $0 -[cnsul[file]] [category,category,...] [geography] [geography] ..."
   exit $E_WRONG_ARGS 
 fi
 
-#  Option specifications
-if [ "${OPTS:1:1}" = "n" ]; then
-  export TYPE="non-sponsored"
-  export GREP_OPT="-v"
-elif [ "${OPTS:1:1}" = "s"]; then
-  export TYPE="sponsored"
-  export GREP_OPT=
-else
-  echo "`basename "$0"`: unsupporeted specification of options"
-  echo "Usage: $0 -[nsu] [category,category,...] [geography] [geography] ..."
-  exit $E_WRONG_ARG
+#  Set option specifications
+grep -q "n" <(echo "$OPTS")
+if [ $? -eq 0 ]; then
+  TYPE="non-sponsored"
+  GREP_OPT="-v"
+fi
+
+grep -q "s" <(echo "$OPTS")
+if [ $? -eq 0 ]; then
+  if [ ! -z "$TYPE" ]; then
+    echo "`basename "$0"`: unsupporeted specification of options"
+    echo "Usage: $0 -[nsu] [category,category,...] [geography] [geography] ..."
+    exit $E_WRONG_ARG
+  fi
+  TYPE="sponsored"
+  GREP_OPT=
 fi 
 
+grep -q "u" <(echo "$OPTS")
+if [ $? -eq 0 ]; then
+  U_OPT=false
+else
+  U_OPT=true
+fi
+
+grep -q "c" <(echo "$OPTS")
+if [ $? -eq 0 ]; then
+  C_OPT=false
+else
+  C_OPT=true
+fi
+
+grep -q "l" <(echo "$OPTS")
+if [ $? -eq 0 ]; then
+  LOG_OPT=
 #  Set some more variables
 CATEGORY="$2,"
 DATE=`date +%d%m%Y_%H%M%S`
@@ -96,7 +119,7 @@ until [ -z "$3" ]; do
 
         ERR=`grep -o "Error [0-9]*" "$PPATH"/"$FNAME"_pg"$PAGE"`
         if [ ! -z "$ERR" ]; then
-          if [ "${OPTS:3:1}" = "u" ]; then
+          if [ $U_TOR ]; then
             echo "`basename "$0"`: HTTP request $ERR: trying again with sleep dealy" >&2
             sleep $SLEEP
           else
@@ -119,9 +142,12 @@ until [ -z "$3" ]; do
         sort -u "$UPATH"/.urls_"$DATE" `ls -A -d  "$UPATH"/*` > "$UPATH"/._urls_"$DATE"
         comm -23 "$UPATH"/._urls_"$DATE" "$UPATH"/.urls_"$DATE" > "$UPATH"/"$FNAME" 
         rm "$UPATH"/.urls_"$DATE" "$UPATH"/._urls_"$DATE" 
-        if [ -s "$UPATH"/"$FNAME" ]; then
+        if [ -s "$UPATH"/._urls_"$DATE" ]; then
           echo "no new unique urls found on page: "$GEOG".backpage.com/"$X"/&page="$PAGE""
-          break
+          if [ $C_OPT ]; then
+            echo "shifting"
+            break
+          fi
         fi 
       fi
 			
