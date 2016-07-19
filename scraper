@@ -1,56 +1,71 @@
-#!/bin/bash  
+#!/bin/bash -x 
 
 #  To-do: 
 #  (1) Problem with Error codes... 5XX, 401-404, maybe more
 #  (2) Stop downloading redundant pages
 #  (3) Parallelize sponsored and non-sponsored scripts
-#  (4) Finish GREP_OPT problem
+#+     -needs to be integreated with dlcnt.sh
+#  (4) Add option to contiue past duplicated URLS
 
 #  Author: Sergio "Checo" Gonzales
 #  Date: 07-17-2016
 #  This was designed to scrape the escort ads of backpage.com
 
-ERR_5XX_TIME_OUT=6
-OTHER_FAILURE_TIME_OUT=6
+#  Some configuation variables and error codes
+TIME_OUT=6
+SLEEP=5
 E_WRONG_ARG=85
-if [ -z "$1" ] || [ "${1:2:1}" != "u" -a ! -z "${1:2:1}" ]; then
+OPTS="$1"
+
+#  Usage errors
+if [ -z "$OPTS" ] || [ "${OPTS:2:1}" != "u" -a ! -z "${OPTS:2:1}" ]; then
   echo "`basename "$0"`: Error: mandiroty options incorrectly specified" >&2
-  echo "Usage: $0 -[ns] [category,category,...] [geography] [geography] ..."
+  echo "Usage: $0 -[nsu] [category,category,...] [geography] [geography] ..."
   exit $E_WRONG_ARGS 
 fi
 if [ -z "$2" ]; then
   echo "`basename "$0"`:Error: Posting category or categories not given without defulat" >&2
-  echo "Usage: $0 -[nst] [category,category,...] [geography] [geography] ..."
+  echo "Usage: $0 -[nsu] [category,category,...] [geography] [geography] ..."
   exit $E_WRONG_ARGS 
 fi
 
 if [ -z "$3" ]; then
   echo "`basename "$0"`:Error: Geography or georgraphies not given without default" >&2
-  echo "Usage: $0 -[nst] [category,category,...] [geography] [geography] ..."
+  echo "Usage: $0 -[nsu] [category,category,...] [geography] [geography] ..."
   exit $E_WRONG_ARGS 
 fi
 
-if [ "${1:1:1}" = "n" ]; then
-  TYPE="non-sponsored"
-  GREP_OPT=""
-elif [ "${1:1:1}" = "s"]; then
-  TYPE="sponsored"
-  GREP_OPT="-v"
+#  Option specifications
+if [ "${OPTS:1:1}" = "n" ]; then
+  export TYPE="non-sponsored"
+  export GREP_OPT="-v"
+elif [ "${OPTS:1:1}" = "s"]; then
+  export TYPE="sponsored"
+  export GREP_OPT=
 else
-  echo "`basename "$0"`: non-parrallel scraping of non/sponsored content not supported"
+  echo "`basename "$0"`: unsupporeted specification of options"
+  echo "Usage: $0 -[nsu] [category,category,...] [geography] [geography] ..."
   exit $E_WRONG_ARG
 fi 
-CATEGORY="$1,"
+
+#  Set some more variables
+CATEGORY="$2,"
 DATE=`date +%d%m%Y_%H%M%S`
 
+#  URL grep function--not sure if I want to try this yet
+#grep-urls () {
+#
+#}
+
 #  Scrape topics
-until [ -z "$2" ]; do
+until [ -z "$3" ]; do
+  GEOG="$3"
   for X in `eval echo {$CATEGORY}`; do
-    export UPATH=./URLs/"$2"/"$X"/"$TYPE"
-    export PPATH=./.pages/"$2"/"$X"
-    export CPATH=./content/"$2"/"$X"/"$TYPE"
+    export UPATH=./URLs/"$GEOG"/"$X"/"$TYPE"
+    export PPATH=./.pages/"$GEOG"/"$X"
+    export CPATH=./content/"$GEOG"/"$X"/"$TYPE"
     PAGE=1
-    FNAME=""$2"_"$X"_"$DATE""
+    FNAME=""$GEOG"_"$X"_"$DATE""
 
     if [ ! -d "$UPATH" ]; then
       mkdir -p "$UPATH"
@@ -61,74 +76,66 @@ until [ -z "$2" ]; do
     if [ ! -d "$CPATH" ]; then
       mkdir -p "$CPATH"
     fi
-    if [ ! -e ./content/"$2"/"$X"/posting_content_raw.csv -o ! -s ./content/"$2"/"$X"/posting_content_raw.csv ]; then
-      echo DATTIME,BODY,AGE,LOCATION,ID,ADTYPE,URL > ./content/"$2"/"$X"/posting_content_raw.csv
+    if [ ! -e ./content/"$GEOG"/"$X"/posting_content_raw.csv -o ! -s ./content/"$GEOG"/"$X"/posting_content_raw.csv ]; then
+      echo DATTIME,BODY,AGE,LOCATION,ID,ADTYPE,URL > ./content/"$GEOG"/"$X"/posting_content_raw.csv
     fi
 
     until [ "$PAGE" -gt 444 ]; do
-      ERR_5XX_COUNT=0
       FAILURES=0
-      echo downloading "$TYPE" URLs from: ""$2".backpage.com/"$X"/&page="$PAGE""
-      curl -s ""$2".backpage.com/"$X"/&page="$PAGE"" > "$PPATH"/"$FNAME"_pg"$PAGE"
-      grep -q  "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$FNAME"_pg"$PAGE"
-      if [ $? -eq 0 ]; then
-	break
-      fi
+      TOR_OPT=
+      until [ -a "$UPATH"/.urls_"$DATE" ] && [ ! -s "$UPATH"/.urls_"$DATE" ] || [ $FAILURES -eq $TIME_OUT ]; do
+
+        echo downloading "$TYPE" URLs from: ""$GEOG".backpage.com/"$X"/&page="$PAGE""
+        $TOR_OPT curl -s ""$GEOG".backpage.com/"$X"/&page="$PAGE"" > "$PPATH"/"$FNAME"_pg"$PAGE"
+        grep -q  "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$FNAME"_pg"$PAGE"
+        if [ $? -eq 0 ]; then
+          break
+        fi
      
-      grep "$GREP_OPT" "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE" | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$UPATH"/.urls
+        grep $GREP_OPT "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE" | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$UPATH"/.urls_"$DATE"
 
-         ERR=`grep -o "Error [0-9]*" "$PPATH"/"$FNAME"_pg"$PAGE"`
-         if [ ! -z "$ERR" ]; then
-           echo "`basename "$0"`: HTTP request $ERR: trying again" >&2
-           sleep 5
-           ((ERR_525_COUNT+=1))
-           if [ $ERR_525_COUNT -eq $ERR_525_TIME_OUT ]; then
-             echo "`basename "$0"`: warning: HTTP $ERR: skipping page "$2".backpage.com/"$X"/&page="$PAGE"" >&2
-             continue
-           fi
-         fi
-         if [ $OTHER_FAILURE_TIME_OUT -eq $FAILURES ]; then
-           echo "`basename "$0"`: error: failure in get-urls()"
-         fi
-         ((FAILURES+=1))
+        ERR=`grep -o "Error [0-9]*" "$PPATH"/"$FNAME"_pg"$PAGE"`
+        if [ ! -z "$ERR" ]; then
+          if [ "${OPTS:3:1}" = "u" ]; then
+            echo "`basename "$0"`: HTTP request $ERR: trying again with sleep dealy" >&2
+            sleep $SLEEP
+          else
+            echo "`basename "$0"`: HTTP request $ERR: tyring again with masked IP address" >&2
+            TOR_OPT="torify" 
+          fi
+        else
+          echo "`basename "$0"`: warning: unknown error; unable to find content" >&2
+        fi
+        ((FAILURES+=1))
       done
-      if [ ! -s "$SUPATH"/.S -a ! -s "$NSUPATH"/.NS ]; then
-        echo "`basename "$0"`: error: no relevant content found on "$2".backpage.com/"$X"/&page="$PAGE"" >&2
-        break 2
-      fi
-      if [ ! -s "$SUPATH"/.S ]; then 
-        echo "`basename "$0"`: warning: sponsored content not found on "$2".backpage.com/"$X"/&page="$PAGE"" >&2
-      fi
-      if [ ! -s "$NSUPATH"/.NS ]; then
-        echo "`basename "$0"`: non-sponsored content not found on "$2".backpage.com/"$X"/&page="$PAGE"" >&2
+      if [ ! -s "$UPATH"/.urls_"$DATE" ]; then
+        echo "`basename "$0"`: warning: no relevant $TYPE content found on "$GEOG".backpage.com/"$X"/&page="$PAGE"" >&2
+        break 1 
       fi
 
-      if [ `ls -A -1 "$NSUPATH"/ | wc -l` -le 1 ]; then 
-        mv "$NSUPATH"/.NS "$NSUPATH"/"$FNAME"_NS
+      if [ `ls -A -1 "$UPATH"/ | wc -l` -le 1 ]; then 
+        mv "$UPATH"/.urls_"$DATE" "$UPATH"/"$FNAME"
       else
-        sort -u "$NSUPATH"/.NS `ls -A -d  "$NSUPATH"/*` > "$NSUPATH"/._NS
-        comm -23 "$NSUPATH"/._NS "$NSUPATH"/.NS > "$NSUPATH"/"$FNAME"_NS 
-        rm "$NSUPATH"/.NS "$NSUPATH"/._NS
-      fi
-      if [ `ls -A -1 "$SUPATH"/ | wc -l` -le 1 ]; then
-	mv "$SUPATH"/.S "$SUPATH"/"$FNAME"_S
-      else
-	sort -u "$SUPATH"/.S `ls -A -d "$SUPATH"/*` > "$SUPATH"/._S
-        comm -23 "$SUPATH"/._S "$SUPATH"/.S > "$SUPATH"/"$FNAME"_S
-        rm "$SUPATH"/.S "$SUPATH"/._S
+        sort -u "$UPATH"/.urls_"$DATE" `ls -A -d  "$UPATH"/*` > "$UPATH"/._urls_"$DATE"
+        comm -23 "$UPATH"/._urls_"$DATE" "$UPATH"/.urls_"$DATE" > "$UPATH"/"$FNAME" 
+        rm "$UPATH"/.urls_"$DATE" "$UPATH"/._urls_"$DATE" 
+        if [ -s "$UPATH"/"$FNAME" ]; then
+          echo "no new unique urls found on page: "$GEOG".backpage.com/"$X"/&page="$PAGE""
+          break
+        fi 
       fi
 			
       ((PAGE+=1))
     done 
     
-    ./dlcnt "NS" "$2" "$X" "$FNAME"
-    if [ $? -ne 0 -a $? -ne 44 ]; then
-       exit $?
-    fi
-    ./dlcnt "S" "$2" "$X" "$FNAME"
-    if [ $? -ne 0 -a $? -ne 44 ]; then
-       exit $?
-    fi 
+#    ./dlcnt "NS" "$GEOG" "$X" "$FNAME"
+#    if [ $? -ne 0 -a $? -ne 44 ]; then
+#       exit $?
+#    fi
+#    ./dlcnt "S" "$GEOG" "$X" "$FNAME"
+#    if [ $? -ne 0 -a $? -ne 44 ]; then
+#       exit $?
+#    fi 
   done
   shift
 done
