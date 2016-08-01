@@ -1,94 +1,83 @@
-#!/bin/bash -x  
+#!/bin/bash  
 
 #  To-do: 
-#  (1) Problem with Error codes... 5XX, 401-404, maybe more
-#  (2) Stop downloading redundant pages
-#  (3) Parallelize sponsored and non-sponsored scripts
-#+     -needs to be integreated with dlcnt.sh
-#  (4) Add option to contiue past duplicated URLS
-#  (5) Fix curl call and sterr option
+#  (1) Check to see if other scraper is running and pages
+#+    -have downloaded
 
 #  Author: Sergio "Checo" Gonzales
-#  Date: 07-19-2016
+#  Date: 07-31-2016
 #  This was designed to scrape the escort ads of backpage.com
 
-#  Some configuation variables and error codes
-TIME_OUT=6
-SLEEP=5
+#  Error Codes
 E_WRONG_ARG=85
-OPTS="${1:1}"
+E_BAD_REQUEST=500
 
-#  Usage errors
-if [ -z "$OPTS" ] || [ "${OPTS:2:1}" != "u" -a ! -z "${OPTS:2:1}" ]; then
-  echo "`basename "$0"`: Error: mandiroty options incorrectly specified" >&2
-  echo "Usage: $0 -[cnsul[file]] [category,category,...] [geography] [geography] ..."
-  exit $E_WRONG_ARGS 
-fi
-if [ -z "$2" ]; then
-  echo "`basename "$0"`:Error: Posting category or categories not given without defulat" >&2
-  echo "Usage: $0 -[cnsul[file]] [category,category,...] [geography] [geography] ..."
-  exit $E_WRONG_ARGS 
+usage () {
+  echo "`basename "$0"`: usage: --duplicate --no-tor --type=[non/sponsored] category,category,... geography geography ..."
+  exit $E_WRONG_ARG
+}
+
+#  Source configuration file
+source ./.scraper.conf
+
+#  Create signaling file to inform dlcnt.sh that URLs are currently
+#+ being copyied to file to prevent early termination
+touch ./.dontstop
+
+#  Set option variables
+TOR=true
+C_OPT=false
+
+while :; do
+  case $1 in 
+    -d | --duplicate )
+      C_OPT=true ;;
+    -n | --no-tor ) 
+      TOR=false ;;
+    -t | --type )
+      if [ ! -z "$2" ]; then
+        TYPE="$2"
+        shift
+      else
+        echo "`basename "$0"`: \"--type\" requires an argument and has no default." >&2
+        exit $E_WRONG_ARGS
+      fi ;;
+    --type=?*)
+      TYPE=${1#*=} ;;
+    --)     
+      shift; break ;;
+    *) break ;;
+  esac
+  shift
+done
+
+if [ -z "$TYPE" ]; then
+  usage
 fi
 
-if [ -z "$3" ]; then
-  echo "`basename "$0"`:Error: Geography or georgraphies not given without default" >&2
-  echo "Usage: $0 -[cnsul[file]] [category,category,...] [geography] [geography] ..."
-  exit $E_WRONG_ARGS 
-fi
-
-#  Set option specifications
-grep -q "n" <(echo "$OPTS")
-if [ $? -eq 0 ]; then
-  TYPE="non-sponsored"
+if [ "$TYPE" = "non-sponsored" ]; then
   GREP_OPT="-v"
 fi
 
-grep -q "s" <(echo "$OPTS")
-if [ $? -eq 0 ]; then
-  if [ ! -z "$TYPE" ]; then
-    echo "`basename "$0"`: unsupporeted specification of options"
-    echo "Usage: $0 -[nsu] [category,category,...] [geography] [geography] ..."
-    exit $E_WRONG_ARG
-  fi
-  TYPE="sponsored"
-  GREP_OPT=
-fi 
-
-grep -q "u" <(echo "$OPTS")
-if [ $? -eq 0 ]; then
-  U_OPT=false
+if [ $TOR = true ]; then
+  TOR_OPT=torify
 else
-  U_OPT=true
+  TOR_OPT=
 fi
 
-grep -q "c" <(echo "$OPTS")
-if [ $? -eq 0 ]; then
-  C_OPT=false
-else
-  C_OPT=true
-fi
-
-grep -q "l" <(echo "$OPTS")
-if [ $? -eq 0 ]; then
-  LOG_OPT=
 #  Set some more variables
-CATEGORY="$2,"
+CATEGORY="$1,"
 DATE=`date +%d%m%Y_%H%M%S`
 
-#  URL grep function--not sure if I want to try this yet
-#grep-urls () {
-#
-#}
-
 #  Scrape topics
-until [ -z "$3" ]; do
-  GEOG="$3"
+until [ -z "$2" ]; do
+  GEOG="$2"
   for X in `eval echo {$CATEGORY}`; do
-    export UPATH=./URLs/"$GEOG"/"$X"/"$TYPE"
-    export PPATH=./.pages/"$GEOG"/"$X"
-    export CPATH=./content/"$GEOG"/"$X"/"$TYPE"
+    CAT="$X"
+    UPATH=./URLs/"$GEOG"/"$CAT"/"$TYPE"
+    PPATH=./.pages/"$GEOG"/"$CAT"
     PAGE=1
-    FNAME=""$GEOG"_"$X"_"$DATE""
+    FNAME="$DATE"
 
     if [ ! -d "$UPATH" ]; then
       mkdir -p "$UPATH"
@@ -96,74 +85,58 @@ until [ -z "$3" ]; do
     if [ ! -d "$PPATH" ]; then
       mkdir -p "$PPATH"
     fi
-    if [ ! -d "$CPATH" ]; then
-      mkdir -p "$CPATH"
-    fi
-    if [ ! -e ./content/"$GEOG"/"$X"/posting_content_raw.csv -o ! -s ./content/"$GEOG"/"$X"/posting_content_raw.csv ]; then
-      echo DATTIME,BODY,AGE,LOCATION,ID,ADTYPE,URL > ./content/"$GEOG"/"$X"/posting_content_raw.csv
-    fi
-
+    
     until [ "$PAGE" -gt 444 ]; do
-      FAILURES=0
-      TOR_OPT=
-      until [ -a "$UPATH"/.urls_"$DATE" ] && [ ! -s "$UPATH"/.urls_"$DATE" ] || [ $FAILURES -eq $TIME_OUT ]; do
+      echo copying "$TYPE" URLs from: ""$GEOG".backpage.com/"$CAT"/"$PQUERY""$PAGE""
+      $TOR_OPT curl -s -o "$PPATH"/"$FNAME"_pg"$PAGE" ""$GEOG".backpage.com/"$CAT"/"$PQUERY""$PAGE"" 
 
-        echo downloading "$TYPE" URLs from: ""$GEOG".backpage.com/"$X"/&page="$PAGE""
-        $TOR_OPT curl -s ""$GEOG".backpage.com/"$X"/&page="$PAGE"" > "$PPATH"/"$FNAME"_pg"$PAGE"
-        grep -q  "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$FNAME"_pg"$PAGE"
-        if [ $? -eq 0 ]; then
-          break
-        fi
-     
-        grep $GREP_OPT "sponsorBoxPlusImages" "$PPATH"/"$FNAME"_pg"$PAGE" | grep -o /"$X"/[a-z\-]*/[0-9]* | sort | uniq > "$UPATH"/.urls_"$DATE"
-
-        ERR=`grep -o "Error [0-9]*" "$PPATH"/"$FNAME"_pg"$PAGE"`
-        if [ ! -z "$ERR" ]; then
-          if [ $U_TOR ]; then
-            echo "`basename "$0"`: HTTP request $ERR: trying again with sleep dealy" >&2
-            sleep $SLEEP
-          else
-            echo "`basename "$0"`: HTTP request $ERR: tyring again with masked IP address" >&2
-            TOR_OPT="torify" 
+      ERR=`grep -o "Error [0-9]*" "$PPATH"/"$FNAME"_pg"$PAGE"`
+      if [ ! -z "$ERR" ]; then
+        echo "`basename "$0"`: HTTP $ERR" >&2
+        if [ $TOR = false ]; then
+          echo "--retrying with masked IP" >&2
+          torify curl -s -o "$PPATH"/"$FNAME"_pg"$PAGE" ""$GEOG".backpage.com/"$CAT"/"$PQUERY""$PAGE"" 
+          ERR2=`grep -o "Error [0-9]*" "$PPATH"/"$FNAME"_pg"$PAGE"`
+          if [ ! -z "$ERR2" ]; then
+            echo "--failed: HTTP $ERR2" >&2
+            echo "$GEOG".backpage.com/"$CAT"/"$PQUERY""$PAGE" >> ./unsucccessful_urls
+            break
           fi
         else
-          echo "`basename "$0"`: warning: unknown error; unable to find content" >&2
+          echo "$GEOG".backpage.com/"$CAT"/"$PQUERY""$PAGE" >> ./unsuccessful_urls
+          break
         fi
-        ((FAILURES+=1))
-      done
+      fi
+
+      grep -q  "<div><b>No matches found.</b><br><br></div>" "$PPATH"/"$FNAME"_pg"$PAGE"
+      if [ $? -eq 0 ]; then
+        break 
+      fi
+      grep $GREP_OPT "$GREP_QUERY" "$PPATH"/"$FNAME"_pg"$PAGE" | grep -o /"$CAT"/[a-z\-]*/[0-9]* | sort | uniq > "$UPATH"/.urls_"$DATE"
       if [ ! -s "$UPATH"/.urls_"$DATE" ]; then
-        echo "`basename "$0"`: warning: no relevant $TYPE content found on "$GEOG".backpage.com/"$X"/&page="$PAGE"" >&2
-        break 1 
+        echo "`basename "$0"`: warning: no relevant $TYPE content found on "$GEOG".backpage.com/"$CAT"/"$PQUERY""$PAGE"" >&2
+        break
       fi
 
       if [ `ls -A -1 "$UPATH"/ | wc -l` -le 1 ]; then 
         mv "$UPATH"/.urls_"$DATE" "$UPATH"/"$FNAME"
       else
         sort -u "$UPATH"/.urls_"$DATE" `ls -A -d  "$UPATH"/*` > "$UPATH"/._urls_"$DATE"
-        comm -23 "$UPATH"/._urls_"$DATE" "$UPATH"/.urls_"$DATE" > "$UPATH"/"$FNAME" 
-        rm "$UPATH"/.urls_"$DATE" "$UPATH"/._urls_"$DATE" 
-        if [ -s "$UPATH"/._urls_"$DATE" ]; then
-          echo "no new unique urls found on page: "$GEOG".backpage.com/"$X"/&page="$PAGE""
-          if [ $C_OPT ]; then
-            echo "shifting"
+        if [ ! -s "$UPATH"/._urls_"$DATE" ]; then
+          echo "no new unique urls found on page: "$GEOG".backpage.com/"$CAT"/"$PQUERY""$PAGE""
+          if [ $C_OPT = true ]; then
             break
           fi
         fi 
+        comm -23 "$UPATH"/._urls_"$DATE" "$UPATH"/.urls_"$DATE" > "$UPATH"/"$FNAME" 
+        rm "$UPATH"/.urls_"$DATE" "$UPATH"/._urls_"$DATE" 
       fi
 			
       ((PAGE+=1))
     done 
-    
-#    ./dlcnt "NS" "$GEOG" "$X" "$FNAME"
-#    if [ $? -ne 0 -a $? -ne 44 ]; then
-#       exit $?
-#    fi
-#    ./dlcnt "S" "$GEOG" "$X" "$FNAME"
-#    if [ $? -ne 0 -a $? -ne 44 ]; then
-#       exit $?
-#    fi 
   done
   shift
 done
 
+rm .dontstop
 exit $?
